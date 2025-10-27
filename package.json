@@ -87,7 +87,7 @@
       "import": "./es/vue/*.js",
       "require": "./lib/vue/*.cjs"
     },
-    "./es/vue/index.css": "./es/vue/index.css",
+    "./es/vue/SizeSelector.vue.css": "./es/vue/SizeSelector.vue.css",
     "./lib/vue/SizeSelector.vue.css": "./lib/vue/SizeSelector.vue.css"
   },
   "main": "./lib/index.cjs",

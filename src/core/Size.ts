@@ -1,16 +1,27 @@
 /**
  * @ldesign/size - Core Size Class
  * 
- * The main Size class for size operations
+ * 核心 Size 类，提供尺寸计算、转换和操作功能
+ * 
+ * 主要功能：
+ * - 单位转换（px, rem, em, vw, vh, % 等）
+ * - 尺寸运算（加减乘除、缩放、取整等）
+ * - 尺寸比较（大于、小于、等于等）
+ * - 对象池优化（减少内存分配）
+ * 
+ * 性能优化：
+ * - 使用对象池减少 GC 压力
+ * - 缓存常用转换结果
+ * - 预定义常用尺寸值
  */
 
-import type { 
-  ScaleFactor, 
-  SizeCalculationOptions, 
-  SizeInput, 
+import type {
+  ScaleFactor,
+  SizeCalculationOptions,
+  SizeInput,
   SizeUnit,
-  SizeValue 
-} from '../types';
+  SizeValue
+} from '../types'
 import {
   addSizes,
   clampSize,
@@ -20,23 +31,26 @@ import {
   roundSize,
   scaleSize,
   subtractSizes
-} from '../utils';
+} from '../utils'
+import { PERFORMANCE_CONFIG } from '../constants/performance'
+import { SIZE_CONFIG, UNITS } from '../constants/sizes'
 
 /**
- * Size对象池，减少频繁创建对象的开销
+ * Size 对象池，减少频繁创建对象的开销
+ * 
+ * 使用对象池模式复用 Size 对象，减少内存分配和 GC 压力
  */
-// 使用全局常量减少重复字符串分配
-const UNIT_PX = 'px' as const;
-const UNIT_REM = 'rem' as const;
-const UNIT_EM = 'em' as const;
-const UNIT_VW = 'vw' as const;
-const UNIT_VH = 'vh' as const;
-const UNIT_PERCENT = '%' as const;
 
-// 预定义常用值，避免重复创建
-const ZERO_PX: SizeValue = Object.freeze({ value: 0, unit: UNIT_PX });
-const ONE_PX: SizeValue = Object.freeze({ value: 1, unit: UNIT_PX });
-const DEFAULT_FONT_SIZE = 16;
+// 使用常量配置减少魔法数字
+const { DEFAULT_ROOT_FONT_SIZE } = SIZE_CONFIG
+const { EPSILON, MAX_SIZE_POOL } = PERFORMANCE_CONFIG
+
+// 使用预定义单位常量减少重复字符串分配
+const { PX: UNIT_PX, REM: UNIT_REM, EM: UNIT_EM, VW: UNIT_VW, VH: UNIT_VH, PERCENT: UNIT_PERCENT } = UNITS
+
+// 预定义常用值，避免重复创建（冻结以防止意外修改）
+const ZERO_PX: SizeValue = Object.freeze({ value: 0, unit: UNIT_PX })
+const ONE_PX: SizeValue = Object.freeze({ value: 1, unit: UNIT_PX })
 
 // 使用位标记减少布尔值内存占用
 const FLAG_POOLED = 1 << 0;
@@ -44,85 +58,182 @@ const FLAG_PIXELS_CACHED = 1 << 1;
 const FLAG_REM_CACHED = 1 << 2;
 
 // 常用值缓存（避免频繁创建相同值的对象）
-const COMMON_VALUES_CACHE = new Map<string, any>();
+const COMMON_VALUES_CACHE = new Map<string, Size>()
 
+/**
+ * Size 对象池
+ * 
+ * 实现对象池模式以复用 Size 实例，减少内存分配和垃圾回收压力
+ * 
+ * 性能优化：
+ * - 自动清理未使用的对象
+ * - 统计命中率用于性能监控
+ * - 限制池大小避免内存膨胀
+ */
 class SizePool {
-  private static instance: SizePool;
-  private pool: Size[] = [];
-  private maxSize = 200; // 增加池大小以减少创建开销
-  private hits = 0;
-  private misses = 0;
-  private created = 0;
-  // 使用Uint8Array存储统计数据，更省内存
-  private stats: Uint32Array = new Uint32Array(5); // [hits, misses, created, poolSize, hitRate*1000]
-  private lastCleanup = Date.now();
-  private readonly CLEANUP_INTERVAL = 60000; // 每分钟清理一次
+  /** 单例实例 */
+  private static instance: SizePool
 
+  /** 对象池存储 */
+  private pool: Size[] = []
+
+  /** 对象池最大大小 */
+  private maxSize = MAX_SIZE_POOL
+
+  /** 命中次数（从池中获取） */
+  private hits = 0
+
+  /** 未命中次数（需要新建） */
+  private misses = 0
+
+  /** 总创建次数 */
+  private created = 0
+
+  /** 上次清理时间戳 */
+  private lastCleanup = Date.now()
+
+  /** 自动清理定时器 ID */
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
+
+  /** 是否已销毁 */
+  private destroyed = false
+
+  /**
+   * 获取单例实例
+   */
   static getInstance(): SizePool {
     if (!SizePool.instance) {
-      SizePool.instance = new SizePool();
+      SizePool.instance = new SizePool()
     }
-    return SizePool.instance;
+    return SizePool.instance
   }
 
+  /**
+   * 构造函数 - 启动自动清理定时器
+   */
+  private constructor() {
+    // 启动自动清理定时器（仅在浏览器环境）
+    if (typeof setInterval !== 'undefined') {
+      this.cleanupTimer = setInterval(() => {
+        if (!this.destroyed) {
+          this.cleanup()
+        }
+      }, PERFORMANCE_CONFIG.CLEANUP_INTERVAL)
+    }
+  }
+
+  /**
+   * 清理未使用的池化对象
+   * 
+   * 保留一半的对象，释放另一半以减少内存占用
+   */
   private cleanup(): void {
-    const now = Date.now();
-    if (now - this.lastCleanup > this.CLEANUP_INTERVAL) {
-      // 只保留一半的对象
-      const keepSize = Math.floor(this.maxSize / 2);
+    const now = Date.now()
+    if (now - this.lastCleanup > PERFORMANCE_CONFIG.CLEANUP_INTERVAL) {
+      // 只保留一半的对象，释放剩余对象
+      const keepSize = Math.floor(this.maxSize / 2)
       if (this.pool.length > keepSize) {
-        this.pool.length = keepSize;
+        this.pool.length = keepSize
       }
-      this.lastCleanup = now;
+      this.lastCleanup = now
     }
   }
 
-  acquire(input: SizeInput, rootFontSize = 16): Size {
-    // 定期清理池
-    this.cleanup();
-    
+  /**
+   * 从对象池获取 Size 对象
+   * 
+   * @param input - 尺寸输入值
+   * @param rootFontSize - 根字体大小
+   * @returns Size 对象实例
+   */
+  acquire(input: SizeInput, rootFontSize = DEFAULT_ROOT_FONT_SIZE): Size {
+    if (this.destroyed) {
+      // 如果池已销毁，直接创建新对象
+      return new Size(input, rootFontSize)
+    }
+
     // 优先从池中获取
     if (this.pool.length > 0) {
-      this.hits++;
-      const size = this.pool.pop()!;
-      size.reset(input, rootFontSize);
-      return size;
+      this.hits++
+      const size = this.pool.pop()!
+      size.reset(input, rootFontSize)
+      return size
     }
+
     // 池为空时创建新对象
-    this.misses++;
-    this.created++;
-    const size = new Size(input, rootFontSize);
-    size._isPooled = true;
-    return size;
+    this.misses++
+    this.created++
+    const size = new Size(input, rootFontSize)
+    size._isPooled = true
+    return size
   }
 
+  /**
+   * 将 Size 对象归还到对象池
+   * 
+   * @param size - 要归还的 Size 对象
+   */
   release(size: Size): void {
-    // 清理对象状态
+    if (this.destroyed) {
+      return // 池已销毁，不再接受归还
+    }
+
+    // 清理对象状态并归还到池中
     if ((size as any)._isPooled && this.pool.length < this.maxSize) {
-      // 使用预定义的零值对象，避免创建新对象
-      (size as any)._value = ZERO_PX;
-      (size as any)._rootFontSize = DEFAULT_FONT_SIZE;
-      (size as any)._flags = FLAG_POOLED; // 重置标记
-      (size as any)._cachedPixels = undefined;
-      (size as any)._cachedRem = undefined;
-      this.pool.push(size);
+      // 重置为零值状态
+      (size as any)._value = ZERO_PX
+        (size as any)._rootFontSize = DEFAULT_ROOT_FONT_SIZE
+          (size as any)._flags = FLAG_POOLED
+            (size as any)._cachedPixels = undefined
+              (size as any)._cachedRem = undefined
+      this.pool.push(size)
     }
   }
 
+  /**
+   * 清空对象池
+   */
   clear(): void {
-    this.pool.length = 0; // 更快的清空方式
+    this.pool.length = 0
   }
 
+  /**
+   * 获取对象池统计信息
+   * 
+   * @returns 统计数据对象
+   */
   getStats() {
-    // 直接返回计算值，避免创建新对象
-    const total = this.hits + this.misses;
+    const total = this.hits + this.misses
     return {
       poolSize: this.pool.length,
       hits: this.hits,
       misses: this.misses,
       created: this.created,
-      hitRate: total ? this.hits / total : 0
-    };
+      hitRate: total ? this.hits / total : 0,
+    }
+  }
+
+  /**
+   * 销毁对象池，清理所有资源
+   */
+  destroy(): void {
+    if (this.destroyed) return
+
+    this.destroyed = true
+
+    // 清除定时器
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+    }
+
+    // 清空池
+    this.pool.length = 0
+
+    // 重置统计
+    this.hits = 0
+    this.misses = 0
+    this.created = 0
   }
 }
 
@@ -135,12 +246,12 @@ export class Size {
   private _flags: number = 0; // 使用位标记替代多个布尔值
   private _cachedPixels?: number; // 缓存像素值
   private _cachedRem?: number; // 缓存rem值
-  
+
   // 使用getter/setter访问标记
   get _isPooled(): boolean {
     return (this._flags & FLAG_POOLED) !== 0;
   }
-  
+
   set _isPooled(value: boolean) {
     if (value) {
       this._flags |= FLAG_POOLED;
@@ -178,12 +289,12 @@ export class Size {
     // 对常用值使用缓存
     if (value === 0) return new Size(ZERO_PX);
     if (value === 1) return new Size(ONE_PX);
-    
+
     // 检查常用值缓存
     const cacheKey = `${value}:px:${DEFAULT_FONT_SIZE}`;
     const cached = COMMON_VALUES_CACHE.get(cacheKey);
     if (cached) return cached.clone();
-    
+
     return new Size({ value, unit: UNIT_PX });
   }
 
@@ -371,7 +482,7 @@ export class Size {
    */
   add(other: SizeInput): Size {
     // 使用池化对象减少内存分配
-    const otherSize = this._isPooled 
+    const otherSize = this._isPooled
       ? SizePool.getInstance().acquire(other, this._rootFontSize)
       : new Size(other, this._rootFontSize);
     const result = addSizes(this._value, otherSize._value, this._rootFontSize);
@@ -455,67 +566,102 @@ export class Size {
   // ============================================
 
   /**
-   * Check if equal to another size
+   * 检查是否等于另一个尺寸
+   * 
+   * 使用像素值进行比较，允许 EPSILON 精度误差
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 是否相等
    */
   equals(other: SizeInput): boolean {
-    // 快速路径：如果是相同的对象类型且值相等
+    // 快速路径：如果是相同的对象类型且单位相同
     if (typeof other === 'object' && 'value' in other && 'unit' in other) {
-      if (other.unit === this._value.unit && Math.abs(other.value - this._value.value) < 0.001) {
-        return true;
+      if (other.unit === this._value.unit && Math.abs(other.value - this._value.value) < EPSILON) {
+        return true
       }
     }
-    
+
     // 使用池化对象减少内存分配
-    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize);
-    const result = Math.abs(this.pixels - otherSize.pixels) < 0.001;
-    otherSize.dispose();
-    return result;
+    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize)
+    const result = Math.abs(this.pixels - otherSize.pixels) < EPSILON
+    otherSize.dispose() // ✅ 确保释放池化对象
+    return result
   }
 
   /**
-   * Check if greater than another size
+   * 检查是否大于另一个尺寸
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 是否大于
    */
   greaterThan(other: SizeInput): boolean {
-    const otherSize = new Size(other, this._rootFontSize);
-    return this.pixels > otherSize.pixels;
+    // ✅ 修复：使用池化对象并正确释放
+    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize)
+    const result = this.pixels > otherSize.pixels
+    otherSize.dispose()
+    return result
   }
 
   /**
-   * Check if greater than or equal to another size
+   * 检查是否大于或等于另一个尺寸
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 是否大于或等于
    */
   greaterThanOrEqual(other: SizeInput): boolean {
-    return this.greaterThan(other) || this.equals(other);
+    return this.greaterThan(other) || this.equals(other)
   }
 
   /**
-   * Check if less than another size
+   * 检查是否小于另一个尺寸
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 是否小于
    */
   lessThan(other: SizeInput): boolean {
-    const otherSize = new Size(other, this._rootFontSize);
-    return this.pixels < otherSize.pixels;
+    // ✅ 修复：使用池化对象并正确释放
+    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize)
+    const result = this.pixels < otherSize.pixels
+    otherSize.dispose()
+    return result
   }
 
   /**
-   * Check if less than or equal to another size
+   * 检查是否小于或等于另一个尺寸
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 是否小于或等于
    */
   lessThanOrEqual(other: SizeInput): boolean {
-    return this.lessThan(other) || this.equals(other);
+    return this.lessThan(other) || this.equals(other)
   }
 
   /**
-   * Get the minimum of this and another size
+   * 获取此尺寸与另一个尺寸的最小值
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 较小的尺寸
    */
   min(other: SizeInput): Size {
-    const otherSize = new Size(other, this._rootFontSize);
-    return this.lessThan(otherSize) ? this.clone() : otherSize.clone();
+    // ✅ 修复：使用池化对象并正确释放
+    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize)
+    const result = this.lessThan(otherSize) ? this.clone() : otherSize.clone()
+    otherSize.dispose()
+    return result
   }
 
   /**
-   * Get the maximum of this and another size
+   * 获取此尺寸与另一个尺寸的最大值
+   * 
+   * @param other - 要比较的尺寸
+   * @returns 较大的尺寸
    */
   max(other: SizeInput): Size {
-    const otherSize = new Size(other, this._rootFontSize);
-    return this.greaterThan(otherSize) ? this.clone() : otherSize.clone();
+    // ✅ 修复：使用池化对象并正确释放
+    const otherSize = SizePool.getInstance().acquire(other, this._rootFontSize)
+    const result = this.greaterThan(otherSize) ? this.clone() : otherSize.clone()
+    otherSize.dispose()
+    return result
   }
 
   // ============================================
@@ -555,7 +701,7 @@ export class Size {
     const fromPx = this.toPixels().value;
     const toPx = toSize.toPixels().value;
     const interpolated = fromPx + (toPx - fromPx) * factor;
-    
+
     return new Size({ value: interpolated, unit: 'px' }, this._rootFontSize)
       .calculate({ unit: this._value.unit });
   }
@@ -682,11 +828,11 @@ export const size = (input: SizeInput, rootFontSize = 16) => {
     if (sizeCache.has(cacheKey)) {
       return sizeCache.get(cacheKey)!.clone();
     }
-    
+
     // 对于小数值使用对象池
     if (input >= 0 && input <= 100) {
       const newSize = SizePool.getInstance().acquire(input, rootFontSize);
-      
+
       // LRU缓存管理
       if (sizeCache.size >= MAX_CACHE_SIZE) {
         const firstKey = sizeCache.keys().next().value;

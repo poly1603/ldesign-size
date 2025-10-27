@@ -1,25 +1,74 @@
 /**
- * @ldesign/size - Size Manager
+ * @ldesign/size - 尺寸管理器
  * 
- * Manages size schemes, persistence, and CSS injection
+ * 核心职责：
+ * 1. 管理预设配置（紧凑、舒适、宽松等）
+ * 2. 生成和注入 CSS 变量到文档
+ * 3. 持久化用户偏好设置
+ * 4. 通知监听器配置变化
+ * 
+ * 性能优化：
+ * - CSS 缓存避免重复生成
+ * - 批量通知监听器减少重绘
+ * - LRU 缓存策略限制内存占用
+ * - 预计算常用尺寸值
+ * 
+ * @example
+ * ```ts
+ * // 创建实例
+ * const manager = new SizeManager({ storageKey: 'my-size' })
+ * 
+ * // 应用预设
+ * manager.applyPreset('comfortable')
+ * 
+ * // 监听变化
+ * manager.subscribe((config) => {
+ *   console.log('尺寸变化:', config.baseSize)
+ * })
+ * ```
+ */
+
+import { PERFORMANCE_CONFIG } from '../constants/performance'
+import { SIZE_CONFIG, SIZE_MULTIPLIERS, CSS_IDENTIFIERS } from '../constants/sizes'
+
+/**
+ * 尺寸配置接口
  */
 export interface SizeConfig {
+  /** 基础字体大小（像素） */
   baseSize: number
 }
 
+/**
+ * 尺寸方案类型（SizeConfig 的别名）
+ */
 export type SizeScheme = SizeConfig
 
+/**
+ * 尺寸预设接口
+ */
 export interface SizePreset {
+  /** 预设名称（唯一标识） */
   name: string
+  /** 显示标签 */
   label: string
+  /** 描述文本 */
   description?: string
+  /** 基础尺寸值 */
   baseSize: number
+  /** 分类（可选） */
   category?: string
 }
 
+/**
+ * 尺寸变化监听器类型
+ */
 export type SizeChangeListener = (config: SizeConfig) => void
 
-const DEFAULT_STORAGE_KEY = 'ldesign-size-scheme'
+// 使用配置常量
+const DEFAULT_STORAGE_KEY = SIZE_CONFIG.DEFAULT_STORAGE_KEY
+const { MAX_CSS_CACHE_SIZE, LISTENER_BATCH_SIZE } = PERFORMANCE_CONFIG
+const { SIZE_STYLE_ID } = CSS_IDENTIFIERS
 
 // Default presets
 const defaultPresets: SizePreset[] = [
@@ -53,69 +102,123 @@ const defaultPresets: SizePreset[] = [
   }
 ]
 
+/**
+ * 尺寸管理器类
+ * 
+ * 管理整个应用的尺寸系统，包括预设配置、CSS 生成和持久化
+ */
 export class SizeManager {
+  /** 当前尺寸配置 */
   private config: SizeConfig
-  private presets: Map<string, SizePreset>
-  private listeners: Set<SizeChangeListener>
-  private styleElement: HTMLStyleElement | null = null
-  private currentPresetName: string = 'default'
-  private storageKey: string
-  private isDestroyed = false
-  private cssCache = new Map<string, string>() // CSS缓存
-  private lastGeneratedCSS = '' // 上次生成的CSS
-  private pendingListenerNotifications: SizeChangeListener[] = [] // 待通知的监听器
-  private notificationScheduled = false // 防止重复调度
-  private readonly MAX_CACHE_SIZE = 50 // 限制缓存大小
 
+  /** 预设配置映射表（name -> preset） */
+  private presets: Map<string, SizePreset>
+
+  /** 监听器集合（使用 Set 自动去重） */
+  private listeners: Set<SizeChangeListener>
+
+  /** 样式元素引用（用于注入 CSS） */
+  private styleElement: HTMLStyleElement | null = null
+
+  /** 当前预设名称 */
+  private currentPresetName: string = 'default'
+
+  /** localStorage 存储键名 */
+  private storageKey: string
+
+  /** 管理器是否已销毁 */
+  private isDestroyed = false
+
+  /** CSS 缓存映射（cacheKey -> css） */
+  private cssCache = new Map<string, string>()
+
+  /** 上次生成的 CSS 字符串（用于去重） */
+  private lastGeneratedCSS = ''
+
+  /** 待通知的监听器列表（批量处理用） */
+  private pendingListenerNotifications: SizeChangeListener[] = []
+
+  /** 是否已调度通知（防止重复调度） */
+  private notificationScheduled = false
+
+  /**
+   * 构造函数
+   * 
+   * @param options - 配置选项
+   * @param options.storageKey - localStorage 存储键名
+   * @param options.presets - 自定义预设数组
+   */
   constructor(options: { storageKey?: string; presets?: SizePreset[] } = {}) {
+    // 初始化存储键名
     this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY
+
+    // 初始化默认配置
     this.config = {
-      baseSize: 16
+      baseSize: SIZE_CONFIG.DEFAULT_BASE_SIZE
     }
 
+    // 初始化预设映射表
     this.presets = new Map()
-    // 使用 Set 管理监听器，通过 destroy 方法确保正确清理
+
+    // 初始化监听器集合（使用 Set 自动去重和高效删除）
     this.listeners = new Set()
 
-    // Add default presets
+    // 加载默认预设
     defaultPresets.forEach(preset => {
       this.presets.set(preset.name, preset)
     })
 
-    // Add custom presets
+    // 加载自定义预设
     if (options.presets) {
       options.presets.forEach(preset => {
         this.presets.set(preset.name, preset)
       })
     }
 
-    // Load saved config
+    // 从存储加载保存的配置
     this.loadFromStorage()
 
-    // Apply initial size
+    // 应用初始尺寸（生成并注入 CSS）
     this.applySize()
   }
 
+  /**
+   * 获取当前配置（返回副本）
+   * 
+   * @returns 当前尺寸配置的副本
+   */
   getConfig(): SizeConfig {
     return { ...this.config }
   }
 
+  /**
+   * 设置配置
+   * 
+   * 会触发 CSS 重新生成、持久化保存和监听器通知
+   * 
+   * @param config - 要更新的配置（部分）
+   * @throws {Error} 如果 baseSize 无效
+   */
   setConfig(config: Partial<SizeConfig>): void {
-    // Validate config
+    // 验证配置
     if (config.baseSize !== undefined) {
       if (typeof config.baseSize !== 'number' || config.baseSize <= 0 || config.baseSize > 100) {
         throw new Error('Invalid baseSize: must be a positive number between 0 and 100')
       }
     }
 
+    // 合并配置
     this.config = {
       ...this.config,
       ...config
     }
 
     try {
+      // 应用新配置
       this.applySize()
+      // 保存到存储
       this.saveToStorage()
+      // 通知监听器
       this.notifyListeners()
     } catch (error) {
       console.error('[SizeManager] Failed to apply config:', error)
@@ -123,10 +226,20 @@ export class SizeManager {
     }
   }
 
+  /**
+   * 设置基础尺寸
+   * 
+   * @param baseSize - 基础字体大小（像素）
+   */
   setBaseSize(baseSize: number): void {
     this.setConfig({ baseSize })
   }
 
+  /**
+   * 应用预设配置
+   * 
+   * @param presetName - 预设名称
+   */
   applyPreset(presetName: string): void {
     const preset = this.presets.get(presetName)
     if (!preset) {
@@ -144,68 +257,120 @@ export class SizeManager {
     console.info(`[SizeManager] 预设应用完成: ${presetName}`)
   }
 
+  /**
+   * 获取当前预设名称
+   * 
+   * @returns 当前预设名称
+   */
   getCurrentPreset(): string {
     return this.currentPresetName
   }
 
+  /**
+   * 获取当前尺寸（getCurrentPreset 的别名）
+   * 
+   * @returns 当前预设名称
+   */
   getCurrentSize(): string {
     return this.currentPresetName
   }
 
+  /**
+   * 设置尺寸（applyPreset 的别名）
+   * 
+   * @param size - 预设名称
+   */
   setSize(size: string): void {
     this.applyPreset(size)
   }
 
+  /**
+   * 获取所有预设名称列表
+   * 
+   * @returns 预设名称数组
+   */
   getSizes(): string[] {
     return Array.from(this.presets.keys())
   }
 
+  /**
+   * 获取所有预设配置
+   * 
+   * @returns 预设配置数组
+   */
   getPresets(): SizePreset[] {
     return Array.from(this.presets.values())
   }
 
+  /**
+   * 添加自定义预设
+   * 
+   * @param preset - 预设配置
+   */
   addPreset(preset: SizePreset): void {
     this.presets.set(preset.name, preset)
   }
 
+  /**
+   * 应用尺寸配置（生成并注入 CSS）
+   * 
+   * 性能优化：
+   * - 复用已存在的 style 元素
+   * - 检查 CSS 是否变化，避免无效更新
+   * - 使用 textContent 提升性能
+   * 
+   * @private
+   */
   private applySize(): void {
+    // 服务端渲染环境跳过
     if (typeof document === 'undefined') return
 
+    // 生成 CSS
     const css = this.generateCSS()
 
     // 首先检查是否已存在 style 元素（处理 HMR 或多实例情况）
     if (!this.styleElement) {
-      const existingElement = document.getElementById('ldesign-size-styles')
+      const existingElement = document.getElementById(SIZE_STYLE_ID)
       if (existingElement && existingElement instanceof HTMLStyleElement) {
         this.styleElement = existingElement
       } else {
         this.styleElement = document.createElement('style')
-        this.styleElement.id = 'ldesign-size-styles'
+        this.styleElement.id = SIZE_STYLE_ID
         document.head.appendChild(this.styleElement)
       }
     }
 
-    // 如果CSS没有变化，避免重新渲染
+    // 如果 CSS 没有变化，避免重新渲染（性能优化）
     if (css === this.lastGeneratedCSS && this.styleElement.textContent === css) {
       return
     }
 
-    // 使用 textContent 比 innerHTML 更快
+    // 使用 textContent 比 innerHTML 更快更安全
     this.styleElement.textContent = css
     this.lastGeneratedCSS = css
   }
 
+  /**
+   * 生成完整的 CSS 字符串
+   * 
+   * 性能优化：
+   * - 使用缓存避免重复生成
+   * - 预计算所有尺寸值
+   * - 使用 Uint16Array 减少内存占用
+   * 
+   * @returns CSS 字符串
+   */
   private generateCSS(): string {
     const { baseSize } = this.config
 
-    // 检查CSS缓存
+    // 检查 CSS 缓存
     const cacheKey = `${baseSize}:${this.currentPresetName}`
     if (this.cssCache.has(cacheKey)) {
       return this.cssCache.get(cacheKey)!
     }
 
     // LRU 缓存策略：限制缓存大小
-    if (this.cssCache.size >= this.MAX_CACHE_SIZE) {
+    if (this.cssCache.size >= MAX_CSS_CACHE_SIZE) {
       const firstKey = this.cssCache.keys().next().value
       if (firstKey !== undefined) {
         this.cssCache.delete(firstKey)
@@ -213,39 +378,46 @@ export class SizeManager {
     }
 
     // 使用 Uint16Array 预计算所有值，减少内存分配
-    const multipliers = [
-      0, 0.0625, 0.125, 0.25, 0.375, 0.5, 0.625, 0.6875, 0.75, 0.8125,
-      0.875, 1, 1.125, 1.25, 1.375, 1.5, 1.625, 1.75, 1.875, 2,
-      2.25, 2.5, 2.625, 2.75, 3, 3.5, 4, 4.5, 5, 6, 7, 8,
-      12, 16, 20, 24, 28, 32
-    ]
-
+    const multipliers = SIZE_MULTIPLIERS as readonly number[]
     const values = new Uint16Array(multipliers.length)
+
+    // 预计算所有尺寸值
     for (let i = 0; i < multipliers.length; i++) {
       values[i] = Math.round(baseSize * multipliers[i])
     }
 
-    // 快速查找函数
-    const cache = new Map<string, string>()
-    const s = (multiplier: number) => {
-      const key = `${multiplier}`
-      if (cache.has(key)) return cache.get(key)!
+    // 创建快速查找映射（缓存计算结果）
+    const valueCache = new Map<number, string>()
+
+    /**
+     * 根据倍数获取像素值字符串
+     * 
+     * @param multiplier - 尺寸倍数
+     * @returns 像素值字符串（如 "16px"）
+     */
+    const getScaledSize = (multiplier: number): string => {
+      // 检查缓存
+      if (valueCache.has(multiplier)) {
+        return valueCache.get(multiplier)!
+      }
+
+      // 尝试从预计算数组中获取
       const idx = multipliers.indexOf(multiplier)
       if (idx !== -1) {
         const value = values[idx]
         const result = value === 0 ? '0' : `${value}px`
-        cache.set(key, result)
+        valueCache.set(multiplier, result)
         return result
       }
+
+      // 计算新值
       const value = Math.round(baseSize * multiplier)
       const result = value === 0 ? '0' : `${value}px`
-      cache.set(key, result)
+      valueCache.set(multiplier, result)
       return result
     }
 
-    // const r = (value: number) => `${value / 16}rem` // rem converter - unused
-
-    // 生成CSS字符串
+    // 生成 CSS 字符串（使用数组 join 提升性能）
     const css = `
       :root {
         /* Base Configuration */
@@ -255,44 +427,44 @@ export class SizeManager {
 
         /* Base Size Tokens (TDesign style - 2px increment) */
         --size-0: 0px;
-        --size-1: ${s(0.125)};
-        --size-2: ${s(0.25)};
-        --size-3: ${s(0.375)};
-        --size-4: ${s(0.5)};
-        --size-5: ${s(0.75)};
-        --size-6: ${s(1)};
-        --size-7: ${s(1.25)};
-        --size-8: ${s(1.5)};
-        --size-9: ${s(1.75)};
-        --size-10: ${s(2)};
-        --size-11: ${s(2.25)};
-        --size-12: ${s(2.5)};
-        --size-13: ${s(3)};
-        --size-14: ${s(3.5)};
-        --size-15: ${s(4)};
-        --size-16: ${s(4.5)};
-        --size-17: ${s(5)};
-        --size-18: ${s(6)};
-        --size-19: ${s(7)};
-        --size-20: ${s(8)};
-        --size-24: ${s(12)};
-        --size-32: ${s(16)};
-        --size-40: ${s(20)};
-        --size-48: ${s(24)};
-        --size-56: ${s(28)};
-        --size-64: ${s(32)};
+        --size-1: ${getScaledSize(0.125)};
+        --size-2: ${getScaledSize(0.25)};
+        --size-3: ${getScaledSize(0.375)};
+        --size-4: ${getScaledSize(0.5)};
+        --size-5: ${getScaledSize(0.75)};
+        --size-6: ${getScaledSize(1)};
+        --size-7: ${getScaledSize(1.25)};
+        --size-8: ${getScaledSize(1.5)};
+        --size-9: ${getScaledSize(1.75)};
+        --size-10: ${getScaledSize(2)};
+        --size-11: ${getScaledSize(2.25)};
+        --size-12: ${getScaledSize(2.5)};
+        --size-13: ${getScaledSize(3)};
+        --size-14: ${getScaledSize(3.5)};
+        --size-15: ${getScaledSize(4)};
+        --size-16: ${getScaledSize(4.5)};
+        --size-17: ${getScaledSize(5)};
+        --size-18: ${getScaledSize(6)};
+        --size-19: ${getScaledSize(7)};
+        --size-20: ${getScaledSize(8)};
+        --size-24: ${getScaledSize(12)};
+        --size-32: ${getScaledSize(16)};
+        --size-40: ${getScaledSize(20)};
+        --size-48: ${getScaledSize(24)};
+        --size-56: ${getScaledSize(28)};
+        --size-64: ${getScaledSize(32)};
 
         /* Font Sizes */
-        --size-font-2xs: ${s(0.625)}; /* 10px */
-        --size-font-xs: ${s(0.6875)}; /* 11px */
-        --size-font-sm: ${s(0.75)};   /* 12px */
-        --size-font-base: ${s(0.875)}; /* 14px */
-        --size-font-md: ${s(1)};       /* 16px */
-        --size-font-lg: ${s(1.125)};   /* 18px */
-        --size-font-xl: ${s(1.25)};    /* 20px */
-        --size-font-2xl: ${s(1.5)};    /* 24px */
-        --size-font-3xl: ${s(1.875)};  /* 30px */
-        --size-font-4xl: ${s(2.25)};   /* 36px */
+        --size-font-2xs: ${getScaledSize(0.625)}; /* 10px */
+        --size-font-xs: ${getScaledSize(0.6875)}; /* 11px */
+        --size-font-sm: ${getScaledSize(0.75)};   /* 12px */
+        --size-font-base: ${getScaledSize(0.875)}; /* 14px */
+        --size-font-md: ${getScaledSize(1)};       /* 16px */
+        --size-font-lg: ${getScaledSize(1.125)};   /* 18px */
+        --size-font-xl: ${getScaledSize(1.25)};    /* 20px */
+        --size-font-2xl: ${getScaledSize(1.5)};    /* 24px */
+        --size-font-3xl: ${getScaledSize(1.875)};  /* 30px */
+        --size-font-4xl: ${getScaledSize(2.25)};   /* 36px */
         
         /* Legacy Support */
         --size-font-tiny: var(--size-font-2xs);
@@ -303,35 +475,35 @@ export class SizeManager {
         --size-font-giant: var(--size-font-xl);
         
         /* Heading Sizes */
-        --size-font-h1: ${s(1.75)};
-        --size-font-h2: ${s(1.5)};
-        --size-font-h3: ${s(1.25)};
-        --size-font-h4: ${s(1.125)};
-        --size-font-h5: ${s(1)};
-        --size-font-h6: ${s(0.875)};
+        --size-font-h1: ${getScaledSize(1.75)};
+        --size-font-h2: ${getScaledSize(1.5)};
+        --size-font-h3: ${getScaledSize(1.25)};
+        --size-font-h4: ${getScaledSize(1.125)};
+        --size-font-h5: ${getScaledSize(1)};
+        --size-font-h6: ${getScaledSize(0.875)};
         
         /* Display Sizes */
-        --size-font-display1: ${s(3)};
-        --size-font-display2: ${s(2.625)};
-        --size-font-display3: ${s(2.25)};
+        --size-font-display1: ${getScaledSize(3)};
+        --size-font-display2: ${getScaledSize(2.625)};
+        --size-font-display3: ${getScaledSize(2.25)};
         
         /* Special Font Sizes */
-        --size-font-caption: ${s(0.6875)};
-        --size-font-overline: ${s(0.625)};
-        --size-font-code: ${s(0.8125)};
+        --size-font-caption: ${getScaledSize(0.6875)};
+        --size-font-overline: ${getScaledSize(0.625)};
+        --size-font-code: ${getScaledSize(0.8125)};
 
         /* Spacing System - Semantic */
         --size-spacing-none: 0;
-        --size-spacing-3xs: ${s(0.0625)};  /* 1px */
-        --size-spacing-2xs: ${s(0.125)};   /* 2px */
-        --size-spacing-xs: ${s(0.25)};     /* 4px */
-        --size-spacing-sm: ${s(0.375)};    /* 6px */
-        --size-spacing-md: ${s(0.5)};      /* 8px */
-        --size-spacing-lg: ${s(0.75)};     /* 12px */
-        --size-spacing-xl: ${s(1)};        /* 16px */
-        --size-spacing-2xl: ${s(1.5)};     /* 24px */
-        --size-spacing-3xl: ${s(2)};       /* 32px */
-        --size-spacing-4xl: ${s(3)};       /* 48px */
+        --size-spacing-3xs: ${getScaledSize(0.0625)};  /* 1px */
+        --size-spacing-2xs: ${getScaledSize(0.125)};   /* 2px */
+        --size-spacing-xs: ${getScaledSize(0.25)};     /* 4px */
+        --size-spacing-sm: ${getScaledSize(0.375)};    /* 6px */
+        --size-spacing-md: ${getScaledSize(0.5)};      /* 8px */
+        --size-spacing-lg: ${getScaledSize(0.75)};     /* 12px */
+        --size-spacing-xl: ${getScaledSize(1)};        /* 16px */
+        --size-spacing-2xl: ${getScaledSize(1.5)};     /* 24px */
+        --size-spacing-3xl: ${getScaledSize(2)};       /* 32px */
+        --size-spacing-4xl: ${getScaledSize(3)};       /* 48px */
         
         /* Legacy Support */
         --size-spacing-tiny: var(--size-spacing-2xs);
@@ -394,13 +566,13 @@ export class SizeManager {
 
         /* Border Radius - Consistent System */
         --size-radius-none: 0;
-        --size-radius-xs: ${s(0.125)};     /* 2px */
-        --size-radius-sm: ${s(0.25)};      /* 4px */
-        --size-radius-md: ${s(0.375)};     /* 6px */
-        --size-radius-lg: ${s(0.5)};       /* 8px */
-        --size-radius-xl: ${s(0.75)};      /* 12px */
-        --size-radius-2xl: ${s(1)};        /* 16px */
-        --size-radius-3xl: ${s(1.5)};      /* 24px */
+        --size-radius-xs: ${getScaledSize(0.125)};     /* 2px */
+        --size-radius-sm: ${getScaledSize(0.25)};      /* 4px */
+        --size-radius-md: ${getScaledSize(0.375)};     /* 6px */
+        --size-radius-lg: ${getScaledSize(0.5)};       /* 8px */
+        --size-radius-xl: ${getScaledSize(0.75)};      /* 12px */
+        --size-radius-2xl: ${getScaledSize(1)};        /* 16px */
+        --size-radius-3xl: ${getScaledSize(1.5)};      /* 24px */
         --size-radius-full: 9999px;
         --size-radius-circle: 50%;
         
@@ -478,68 +650,68 @@ export class SizeManager {
         --size-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
         /* Button Sizes */
-        --size-btn-height-tiny: ${s(1.5)};
-        --size-btn-height-small: ${s(1.75)};
-        --size-btn-height-medium: ${s(2)};
-        --size-btn-height-large: ${s(2.25)};
-        --size-btn-height-huge: ${s(2.5)};
-        --size-btn-padding-tiny: 0 ${s(0.5)};
-        --size-btn-padding-small: 0 ${s(0.625)};
-        --size-btn-padding-medium: 0 ${s(0.875)};
-        --size-btn-padding-large: 0 ${s(1)};
-        --size-btn-padding-huge: 0 ${s(1.25)};
+        --size-btn-height-tiny: ${getScaledSize(1.5)};
+        --size-btn-height-small: ${getScaledSize(1.75)};
+        --size-btn-height-medium: ${getScaledSize(2)};
+        --size-btn-height-large: ${getScaledSize(2.25)};
+        --size-btn-height-huge: ${getScaledSize(2.5)};
+        --size-btn-padding-tiny: 0 ${getScaledSize(0.5)};
+        --size-btn-padding-small: 0 ${getScaledSize(0.625)};
+        --size-btn-padding-medium: 0 ${getScaledSize(0.875)};
+        --size-btn-padding-large: 0 ${getScaledSize(1)};
+        --size-btn-padding-huge: 0 ${getScaledSize(1.25)};
 
         /* Input Sizes */
-        --size-input-height-small: ${s(1.75)};
-        --size-input-height-medium: ${s(2)};
-        --size-input-height-large: ${s(2.25)};
-        --size-input-padding-small: ${s(0.25)} ${s(0.5)};
-        --size-input-padding-medium: ${s(0.375)} ${s(0.625)};
-        --size-input-padding-large: ${s(0.5)} ${s(0.75)};
+        --size-input-height-small: ${getScaledSize(1.75)};
+        --size-input-height-medium: ${getScaledSize(2)};
+        --size-input-height-large: ${getScaledSize(2.25)};
+        --size-input-padding-small: ${getScaledSize(0.25)} ${getScaledSize(0.5)};
+        --size-input-padding-medium: ${getScaledSize(0.375)} ${getScaledSize(0.625)};
+        --size-input-padding-large: ${getScaledSize(0.5)} ${getScaledSize(0.75)};
 
         /* Icon Sizes */
-        --size-icon-tiny: ${s(0.75)};
-        --size-icon-small: ${s(0.875)};
-        --size-icon-medium: ${s(1)};
-        --size-icon-large: ${s(1.25)};
-        --size-icon-huge: ${s(1.5)};
-        --size-icon-giant: ${s(2)};
+        --size-icon-tiny: ${getScaledSize(0.75)};
+        --size-icon-small: ${getScaledSize(0.875)};
+        --size-icon-medium: ${getScaledSize(1)};
+        --size-icon-large: ${getScaledSize(1.25)};
+        --size-icon-huge: ${getScaledSize(1.5)};
+        --size-icon-giant: ${getScaledSize(2)};
 
         /* Avatar Sizes */
-        --size-avatar-tiny: ${s(1.25)};
-        --size-avatar-small: ${s(1.5)};
-        --size-avatar-medium: ${s(2)};
-        --size-avatar-large: ${s(2.5)};
-        --size-avatar-huge: ${s(3)};
-        --size-avatar-giant: ${s(4)};
+        --size-avatar-tiny: ${getScaledSize(1.25)};
+        --size-avatar-small: ${getScaledSize(1.5)};
+        --size-avatar-medium: ${getScaledSize(2)};
+        --size-avatar-large: ${getScaledSize(2.5)};
+        --size-avatar-huge: ${getScaledSize(3)};
+        --size-avatar-giant: ${getScaledSize(4)};
 
         /* Card Padding */
-        --size-card-padding-small: ${s(0.5)};
-        --size-card-padding-medium: ${s(0.75)};
-        --size-card-padding-large: ${s(1)};
+        --size-card-padding-small: ${getScaledSize(0.5)};
+        --size-card-padding-medium: ${getScaledSize(0.75)};
+        --size-card-padding-large: ${getScaledSize(1)};
 
         /* Table Sizes */
-        --size-table-row-height-small: ${s(2.25)};
-        --size-table-row-height-medium: ${s(2.75)};
-        --size-table-row-height-large: ${s(3.25)};
+        --size-table-row-height-small: ${getScaledSize(2.25)};
+        --size-table-row-height-medium: ${getScaledSize(2.75)};
+        --size-table-row-height-large: ${getScaledSize(3.25)};
 
         /* Form Sizes */
-        --size-form-label-margin: 0 0 ${s(0.125)} 0;
-        --size-form-group-margin: 0 0 ${s(1)} 0;
+        --size-form-label-margin: 0 0 ${getScaledSize(0.125)} 0;
+        --size-form-group-margin: 0 0 ${getScaledSize(1)} 0;
 
         /* Tag/Badge Sizes */
-        --size-tag-height: ${s(1.5)};
-        --size-tag-padding: 0 ${s(0.25)};
+        --size-tag-height: ${getScaledSize(1.5)};
+        --size-tag-padding: 0 ${getScaledSize(0.25)};
 
         /* Modal Sizes */
-        --size-modal-width-small: ${s(25)};
-        --size-modal-width-medium: ${s(37.5)};
-        --size-modal-width-large: ${s(50)};
+        --size-modal-width-small: ${getScaledSize(25)};
+        --size-modal-width-medium: ${getScaledSize(37.5)};
+        --size-modal-width-large: ${getScaledSize(50)};
 
         /* Drawer Sizes */
-        --size-drawer-width-small: ${s(20)};
-        --size-drawer-width-medium: ${s(30)};
-        --size-drawer-width-large: ${s(40)};
+        --size-drawer-width-small: ${getScaledSize(20)};
+        --size-drawer-width-medium: ${getScaledSize(30)};
+        --size-drawer-width-large: ${getScaledSize(40)};
 
         /* Container Widths */
         --size-container-sm: 640px;
@@ -564,7 +736,13 @@ export class SizeManager {
     return css
   }
 
+  /**
+   * 从 localStorage 加载保存的配置
+   * 
+   * @private
+   */
   private loadFromStorage(): void {
+    // 服务端渲染环境跳过
     if (typeof localStorage === 'undefined') return
 
     try {
@@ -579,11 +757,17 @@ export class SizeManager {
         }
       }
     } catch (e) {
-      console.error('Failed to load size config from storage:', e)
+      console.error('[SizeManager] Failed to load config from storage:', e)
     }
   }
 
+  /**
+   * 保存当前配置到 localStorage
+   * 
+   * @private
+   */
   private saveToStorage(): void {
+    // 服务端渲染环境跳过
     if (typeof localStorage === 'undefined') return
 
     try {
@@ -593,16 +777,34 @@ export class SizeManager {
       }
       localStorage.setItem(this.storageKey, JSON.stringify(data))
     } catch (e) {
-      console.error('Failed to save size config to storage:', e)
+      console.error('[SizeManager] Failed to save config to storage:', e)
     }
   }
 
+  /**
+   * 订阅配置变化事件
+   * 
+   * @param listener - 变化监听器函数
+   * @returns 取消订阅函数
+   * 
+   * @example
+   * ```ts
+   * const unsubscribe = manager.subscribe((config) => {
+   *   console.log('Size changed:', config.baseSize)
+   * })
+   * 
+   * // 取消订阅
+   * unsubscribe()
+   * ```
+   */
   subscribe(listener: SizeChangeListener): () => void {
     if (!this.listeners || this.isDestroyed) {
-      console.warn('SizeManager listeners not initialized or destroyed')
+      console.warn('[SizeManager] Cannot subscribe: manager not initialized or destroyed')
       return () => { }
     }
+
     this.listeners.add(listener)
+
     // 返回清理函数，确保内存正确释放
     return () => {
       if (this.listeners && !this.isDestroyed) {
@@ -611,47 +813,100 @@ export class SizeManager {
     }
   }
 
+  /**
+   * 监听配置变化（subscribe 的别名）
+   * 
+   * @param listener - 变化监听器函数
+   * @returns 取消订阅函数
+   */
   onChange(listener: SizeChangeListener): () => void {
     return this.subscribe(listener)
   }
 
+  /**
+   * 通知所有监听器配置已变化
+   * 
+   * 性能优化：
+   * - 使用 requestIdleCallback 在空闲时执行，不阻塞主线程
+   * - 批量处理监听器，每批处理固定数量
+   * - 防止重复调度
+   * 
+   * @private
+   */
   private notifyListeners(): void {
-    // 批量处理监听器通知，避免阻塞主线程
-    if (!this.notificationScheduled && this.pendingListenerNotifications.length === 0) {
-      this.pendingListenerNotifications = Array.from(this.listeners)
-      this.notificationScheduled = true
+    // 如果已经调度或没有监听器，直接返回
+    if (this.notificationScheduled || this.listeners.size === 0) {
+      return
+    }
 
-      // 使用微任务异步通知
-      queueMicrotask(() => {
-        const listeners = this.pendingListenerNotifications
-        this.pendingListenerNotifications = []
-        this.notificationScheduled = false
+    // 标记为已调度，防止重复
+    this.notificationScheduled = true
+    this.pendingListenerNotifications = Array.from(this.listeners)
 
-        // 批量执行，每次最多处理10个，避免阻塞太久
-        const batchSize = 10
-        let index = 0
+    // 使用 requestIdleCallback 在空闲时通知（优先级低）
+    // 如果不支持则降级到 setTimeout
+    const scheduleNotification = typeof requestIdleCallback !== 'undefined'
+      ? requestIdleCallback
+      : (cb: () => void) => setTimeout(cb, 0)
 
-        const processBatch = () => {
-          const end = Math.min(index + batchSize, listeners.length)
-          for (; index < end; index++) {
-            try {
-              listeners[index](this.config)
-            } catch (error) {
-              console.error('[SizeManager] Listener error:', error)
-            }
+    scheduleNotification(() => {
+      const listeners = this.pendingListenerNotifications
+      this.pendingListenerNotifications = []
+      this.notificationScheduled = false
+
+      // 如果管理器已销毁，不再通知
+      if (this.isDestroyed) {
+        return
+      }
+
+      // 批量执行监听器
+      const batchSize = LISTENER_BATCH_SIZE
+      let index = 0
+
+      /**
+       * 处理一批监听器
+       */
+      const processBatch = () => {
+        const startTime = performance.now()
+        const maxTime = PERFORMANCE_CONFIG.MAX_BATCH_TIME
+
+        // 处理当前批次
+        while (index < listeners.length) {
+          try {
+            listeners[index](this.config)
+          } catch (error) {
+            console.error('[SizeManager] Listener error:', error)
           }
+          index++
 
-          if (index < listeners.length) {
-            // 还有更多监听器，继续处理
-            queueMicrotask(processBatch)
+          // 如果超过时间预算，让出主线程
+          if (performance.now() - startTime > maxTime && index < listeners.length) {
+            scheduleNotification(processBatch)
+            return
           }
         }
+      }
 
-        processBatch()
-      })
-    }
+      processBatch()
+    })
   }
 
+  /**
+   * 销毁管理器，清理所有资源
+   * 
+   * 包括：
+   * - 移除 DOM 中的 style 元素
+   * - 清理所有监听器
+   * - 清空预设和缓存
+   * - 标记为已销毁状态
+   * 
+   * @example
+   * ```ts
+   * const manager = new SizeManager()
+   * // ... 使用管理器
+   * manager.destroy() // 清理资源
+   * ```
+   */
   destroy(): void {
     if (this.isDestroyed) return
 
@@ -667,7 +922,7 @@ export class SizeManager {
     }
     this.pendingListenerNotifications = []
 
-    // 清理 presets
+    // 清理预设映射表
     this.presets.clear()
 
     // 清理缓存
@@ -679,5 +934,16 @@ export class SizeManager {
   }
 }
 
-// Export a singleton instance
+/**
+ * 默认导出的单例实例
+ * 
+ * 可以在整个应用中共享使用
+ * 
+ * @example
+ * ```ts
+ * import { sizeManager } from '@ldesign/size'
+ * 
+ * sizeManager.applyPreset('comfortable')
+ * ```
+ */
 export const sizeManager = new SizeManager()
