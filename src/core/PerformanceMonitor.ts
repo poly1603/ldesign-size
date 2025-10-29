@@ -25,6 +25,104 @@ import { PERFORMANCE_CONFIG } from '../constants/performance'
 import { globalCacheManager } from '../utils/CacheManager'
 
 /**
+ * 环形缓冲区
+ * 
+ * 用于存储固定大小的历史数据，避免 shift/unshift 操作的 O(n) 复杂度
+ * 
+ * ⚡ 性能：
+ * - push: O(1)
+ * - 无需 shift 操作
+ * - 固定内存占用
+ * 
+ * @template T - 数据类型
+ */
+class CircularBuffer<T> {
+  /** 内部缓冲区数组 */
+  private buffer: T[]
+
+  /** 头指针（下一个写入位置） */
+  private head = 0
+
+  /** 当前大小 */
+  private _size = 0
+
+  /** 缓冲区容量 */
+  private readonly capacity: number
+
+  /**
+   * 构造函数
+   * 
+   * @param capacity - 缓冲区容量
+   */
+  constructor(capacity: number) {
+    this.capacity = capacity
+    this.buffer = new Array(capacity)
+  }
+
+  /**
+   * 添加元素到缓冲区
+   * 
+   * ⚡ 性能: O(1)
+   * 
+   * @param item - 要添加的元素
+   */
+  push(item: T): void {
+    this.buffer[this.head] = item
+    this.head = (this.head + 1) % this.capacity
+
+    if (this._size < this.capacity) {
+      this._size++
+    }
+  }
+
+  /**
+   * 获取当前大小
+   */
+  get size(): number {
+    return this._size
+  }
+
+  /**
+   * 转换为数组（按照插入顺序）
+   * 
+   * ⚡ 性能: O(n)
+   * 
+   * @returns 数组
+   */
+  toArray(): T[] {
+    if (this._size === 0) {
+      return []
+    }
+
+    const result: T[] = []
+
+    if (this._size < this.capacity) {
+      // 未满，直接返回前面的元素
+      for (let i = 0; i < this._size; i++) {
+        result.push(this.buffer[i])
+      }
+    } else {
+      // 已满，从 head 开始读取
+      for (let i = 0; i < this.capacity; i++) {
+        const index = (this.head + i) % this.capacity
+        result.push(this.buffer[index])
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * 清空缓冲区
+   */
+  clear(): void {
+    this.head = 0
+    this._size = 0
+    // 不清空数组内容，只重置指针（性能优化）
+  }
+}
+
+/**
  * 性能指标接口
  */
 export interface PerformanceMetrics {
@@ -107,8 +205,8 @@ export class PerformanceMonitor {
   /** 开始时间映射表 */
   private startTimes: Map<string, number> = new Map()
 
-  /** 性能历史记录（用于趋势分析） */
-  private history: Map<string, number[]> = new Map()
+  /** 性能历史记录（用于趋势分析） - 使用环形缓冲区优化 */
+  private history: Map<string, CircularBuffer<number>> = new Map()
 
   /** 性能预算配置 */
   private budget: PerformanceBudget = {
@@ -170,22 +268,21 @@ export class PerformanceMonitor {
   /**
    * 记录指标到历史记录
    * 
+   * ⚡ 性能: O(1) - 使用环形缓冲区避免 shift 操作
+   * 
    * @param operation - 操作名称
    * @param value - 指标值
    * @private
    */
   private recordToHistory(operation: string, value: number): void {
-    if (!this.history.has(operation)) {
-      this.history.set(operation, [])
+    let buffer = this.history.get(operation)
+
+    if (!buffer) {
+      buffer = new CircularBuffer<number>(this.MAX_HISTORY_SIZE)
+      this.history.set(operation, buffer)
     }
 
-    const hist = this.history.get(operation)!
-    hist.push(value)
-
-    // 限制历史记录大小（LRU策略）
-    if (hist.length > this.MAX_HISTORY_SIZE) {
-      hist.shift()
-    }
+    buffer.push(value) // O(1) 操作，无需 shift
   }
 
   /**
@@ -398,19 +495,24 @@ export class PerformanceMonitor {
    * ```
    */
   getTrend(operation: string, samples?: number): PerformanceTrend {
-    const hist = this.history.get(operation)
-    if (!hist || hist.length < 3) {
+    const buffer = this.history.get(operation)
+    if (!buffer || buffer.size < 3) {
       return 'stable' // 数据不足，假设稳定
     }
 
-    // 使用指定样本数或全部历史
-    const sampleSize = samples ?? Math.min(hist.length, this.MAX_HISTORY_SIZE)
-    const recentData = hist.slice(-sampleSize)
+    // 转换为数组（O(n) 但只在需要时调用）
+    const recentData = buffer.toArray()
+
+    // 如果指定了样本数，只使用最近的样本
+    const sampleSize = samples ?? recentData.length
+    const dataToAnalyze = samples && samples < recentData.length
+      ? recentData.slice(-samples)
+      : recentData
 
     // 计算前半部分和后半部分的平均值
-    const mid = Math.floor(recentData.length / 2)
-    const firstHalf = recentData.slice(0, mid)
-    const secondHalf = recentData.slice(mid)
+    const mid = Math.floor(dataToAnalyze.length / 2)
+    const firstHalf = dataToAnalyze.slice(0, mid)
+    const secondHalf = dataToAnalyze.slice(mid)
 
     const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
     const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length

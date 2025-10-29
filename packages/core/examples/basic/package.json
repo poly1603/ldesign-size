@@ -1,0 +1,20 @@
+{
+  "name": "@ldesign/size-core-example-basic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Basic example for @ldesign/size-core",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ldesign/size-core": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12",
+    "typescript": "^5.7.3"
+  }
+}
+

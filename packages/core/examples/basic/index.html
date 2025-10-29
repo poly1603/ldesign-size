@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Core Size Example - @ldesign/size-core</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 Core 尺寸管理示例</h1>
+      <p>使用原生 JS 和 @ldesign/size-core</p>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">选择器控制</h3>
+      <select id="preset-selector" class="selector">
+        <option value="compact">紧凑 (12px)</option>
+        <option value="normal" selected>正常 (14px)</option>
+        <option value="comfortable">舒适 (16px)</option>
+        <option value="large">大号 (18px)</option>
+        <option value="extra-large">超大 (20px)</option>
+      </select>
+
+      <div id="preset-buttons" class="button-group" style="margin-top: 1rem;"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">当前配置信息</h3>
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-label">当前预设</div>
+          <div class="info-value" id="current-preset">normal</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">基础字体大小</div>
+          <div class="info-value" id="base-size">14px</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">行高</div>
+          <div class="info-value" id="line-height">21px</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">可用预设数</div>
+          <div class="info-value" id="preset-count">5</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">动态文字大小演示</h3>
+      <div class="demo-text" id="demo-text">
+        <h2>响应式标题</h2>
+        <p>
+          这段文字的大小会根据你选择的尺寸预设自动调整。
+          @ldesign/size-core 是一个框架无关的核心包，
+          可以在任何环境中使用，包括原生 JS、Vue、React、Svelte、Solid.js 等。
+        </p>
+        <p>
+          核心包提供了强大的 SizeManager 类，支持预设管理、配置更新、
+          事件订阅等功能，是整个尺寸管理系统的基础。
+        </p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">手动微调控制</h3>
+      <div class="button-group">
+        <button class="btn" id="btn-increase">➕ 增大字体</button>
+        <button class="btn" id="btn-decrease">➖ 减小字体</button>
+        <button class="btn btn-outline" id="btn-reset">🔄 重置</button>
+      </div>
+
+      <div style="margin-top: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+          滑块调整：<span id="slider-value">14</span>px
+        </label>
+        <input type="range" id="size-slider" min="10" max="24" value="14" style="width: 100%;">
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">所有可用预设</h3>
+      <div class="info-grid" id="preset-list"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">API 使用示例</h3>
+      <div class="demo-text">
+        <h2>核心 API</h2>
+        <pre><code>import { SizeManager } from '@ldesign/size-core'
+
+// 创建管理器
+const manager = new SizeManager({
+  presets: customPresets,
+  storageKey: 'my-app-size'
+})
+
+// 应用预设
+manager.applyPreset('large')
+
+// 订阅变化
+manager.subscribe((config) => {
+  console.log('配置已更新:', config)
+})
+
+// 设置基础尺寸
+manager.setBaseSize(16)
+
+// 获取当前配置
+const config = manager.getConfig()</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Powered by <a href="https://github.com/ldesign/ldesign" target="_blank">@ldesign/size-core</a> | 原生 JavaScript ⚡
+    </p>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>
+

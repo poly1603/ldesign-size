@@ -18,6 +18,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      // ✅ 添加覆盖率阈值（符合 LDesign 包开发规范）
+      thresholds: {
+        statements: 80,
+        branches: 75,
+        functions: 80,
+        lines: 80,
+      },
       exclude: [
         'node_modules/',
         '__tests__/',

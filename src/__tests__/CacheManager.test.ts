@@ -145,6 +145,94 @@ describe('LRUCache', () => {
       expect(stats.hits).toBe(0)
       expect(stats.misses).toBe(0)
     })
+
+    it('应该统计内存使用', () => {
+      cache.set('key1', 'value1')
+      cache.set('key2', 'value2')
+
+      const stats = cache.getStats()
+      expect(stats.memoryUsage).toBeGreaterThan(0)
+      expect(stats.maxMemory).toBeUndefined() // 未设置内存限制
+    })
+
+    it('应该统计淘汰次数', () => {
+      // 填满缓存
+      cache.set('a', 1)
+      cache.set('b', 2)
+      cache.set('c', 3)
+
+      // 超出限制，触发淘汰
+      cache.set('d', 4)
+
+      const stats = cache.getStats()
+      expect(stats.evictions).toBe(1)
+    })
+  })
+
+  describe('内存管理', () => {
+    it('应该支持基于内存的限制', () => {
+      // 创建一个有内存限制的缓存（1KB）
+      const memCache = new LRUCache<string, string>(100, 1024)
+
+      // 添加大量数据直到触发内存限制
+      for (let i = 0; i < 100; i++) {
+        memCache.set(`key${i}`, 'x'.repeat(100)) // 每个约 100 字节
+      }
+
+      const stats = memCache.getStats()
+      expect(stats.memoryUsage).toBeLessThanOrEqual(1024 * 1.1) // 允许 10% 误差
+      expect(stats.evictions).toBeGreaterThan(0) // 应该触发淘汰
+    })
+
+    it('应该优先按内存限制淘汰', () => {
+      const memCache = new LRUCache<string, string>(10, 500)
+
+      // 添加会超出内存限制的数据
+      memCache.set('big1', 'x'.repeat(200))
+      memCache.set('big2', 'x'.repeat(200))
+      memCache.set('big3', 'x'.repeat(200)) // 应该触发淘汰
+
+      const stats = memCache.getStats()
+      expect(stats.size).toBeLessThan(3) // 应该淘汰了至少一个
+      expect(stats.memoryUsage).toBeLessThanOrEqual(500 * 1.1)
+    })
+  })
+
+  describe('双向链表操作', () => {
+    it('应该保持正确的 LRU 顺序', () => {
+      cache.set('a', 1)
+      cache.set('b', 2)
+      cache.set('c', 3)
+
+      // 访问 'a'，使其成为最近使用
+      cache.get('a')
+
+      // 再添加一个，应该淘汰 'b'
+      cache.set('d', 4)
+
+      expect(cache.has('a')).toBe(true)
+      expect(cache.has('b')).toBe(false) // 应该被淘汰
+      expect(cache.has('c')).toBe(true)
+      expect(cache.has('d')).toBe(true)
+    })
+
+    it('应该在大量操作后保持性能 (O(1))', () => {
+      const largeCache = new LRUCache<number, number>(1000)
+
+      const startTime = performance.now()
+
+      // 10000 次操作
+      for (let i = 0; i < 10000; i++) {
+        largeCache.set(i % 1000, i)
+        largeCache.get(i % 500)
+      }
+
+      const endTime = performance.now()
+      const duration = endTime - startTime
+
+      // 10000 次操作应该在 100ms 内完成（O(1) 操作）
+      expect(duration).toBeLessThan(100)
+    })
   })
 })
 

@@ -324,6 +324,40 @@ export {
   globalCacheManager
 } from './utils/CacheManager'
 
+// Memory Monitor exports
+export {
+  MemoryMonitor,
+  memoryMonitor,
+  type MemoryPressureLevel,
+  type MemoryReport,
+  type MemoryMonitorConfig
+} from './utils/MemoryMonitor'
+
+// Resource Manager exports
+export {
+  ResourceManager,
+  ResourceGroup,
+  using,
+  usingSync,
+  type Disposable
+} from './utils/ResourceManager'
+
+// Shared Utils exports
+export {
+  createSafeInterval,
+  createSafeTimeout,
+  formatMemorySize,
+  formatPercent,
+  formatDuration,
+  batchProcess,
+  throttle,
+  debounce,
+  deepClone,
+  safeJSONParse,
+  sleep,
+  retry
+} from './utils/SharedUtils'
+
 // Error handling exports
 export {
   SizeError,

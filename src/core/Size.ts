@@ -108,6 +108,18 @@ class SizePool {
     return SizePool.instance
   }
 
+  /** 最大内存占用（字节） */
+  private maxMemory = 5 * 1024 * 1024 // 5MB
+
+  /** 内存警告阈值 */
+  private memoryWarningThreshold = 0.8 // 80%
+
+  /** 上次内存警告时间 */
+  private lastMemoryWarning = 0
+
+  /** 内存警告间隔（避免频繁警告） */
+  private memoryWarningInterval = 60000 // 1分钟
+
   /**
    * 构造函数 - 启动自动清理定时器
    */
@@ -119,6 +131,58 @@ class SizePool {
           this.cleanup()
         }
       }, PERFORMANCE_CONFIG.CLEANUP_INTERVAL)
+
+      // ✅ 使用 unref() 防止阻止 Node.js 进程退出
+      // 在浏览器环境中 unref() 不存在，使用可选链操作符
+      if (typeof (this.cleanupTimer as any).unref === 'function') {
+        (this.cleanupTimer as any).unref()
+      }
+    }
+  }
+
+  /**
+   * 估算对象池的内存占用
+   * 
+   * ⚡ 性能: O(1) - 使用简单估算避免遍历
+   * 
+   * @returns 估算的字节数
+   * @private
+   */
+  private estimatePoolMemory(): number {
+    // 每个 Size 对象约 64 字节（包括对象头、字段和引用）
+    // _value: SizeValue (8 + 8 + string) ≈ 24 字节
+    // _rootFontSize: number = 8 字节
+    // _flags: number = 8 字节
+    // _cachedPixels: number | undefined = 8 字节
+    // _cachedRem: number | undefined = 8 字节
+    // _isPooled: boolean = 4 字节
+    // 对象头 = 约 16 字节
+    // 总计 ≈ 76 字节，向下取整为 64 字节
+    return this.pool.length * 64
+  }
+
+  /**
+   * 检查内存使用并发出警告
+   * 
+   * @private
+   */
+  private checkMemoryUsage(): void {
+    const currentMemory = this.estimatePoolMemory()
+    const usageRatio = currentMemory / this.maxMemory
+
+    if (usageRatio > this.memoryWarningThreshold) {
+      const now = Date.now()
+
+      // 避免频繁警告
+      if (now - this.lastMemoryWarning > this.memoryWarningInterval) {
+        console.warn(
+          `[SizePool] 内存使用警告: ${(currentMemory / 1024 / 1024).toFixed(2)}MB / ${(this.maxMemory / 1024 / 1024).toFixed(2)}MB (${(usageRatio * 100).toFixed(1)}%)`
+        )
+        this.lastMemoryWarning = now
+
+        // 触发清理
+        this.cleanup()
+      }
     }
   }
 
@@ -151,6 +215,9 @@ class SizePool {
       // 如果池已销毁，直接创建新对象
       return new Size(input, rootFontSize)
     }
+
+    // 检查内存使用情况
+    this.checkMemoryUsage()
 
     // 优先从池中获取
     if (this.pool.length > 0) {

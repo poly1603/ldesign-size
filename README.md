@@ -11,11 +11,12 @@
 
 - 🚀 **开箱即用** - 零配置快速上手，一行代码启用尺寸缩放
 - 🎨 **动态 CSS 变量** - 智能生成完整的 CSS 变量系统，覆盖字体、间距、组件尺寸等
-- 🔧 **框架无关** - 支持原生 JS、React、Angular 等所有前端框架
-- 💎 **Vue 生态完整支持** - 提供 Plugin、Composition API、组件等多种使用方式
+- 🔧 **多框架支持** - 支持 Vue 3、React、Svelte 5、Solid.js 及原生 JS
+- 💎 **完整生态支持** - 每个框架都提供专用 API、Hooks/Composables 和组件
 - 📱 **响应式友好** - 完美适配移动端，支持多种尺寸模式切换
 - 🎯 **TypeScript 优先** - 完整的类型定义，零 TS 错误，极佳的开发体验
-- ⚡ **性能优越** - LRU 缓存系统，性能提升 75%+，内存优化 30%+
+- ⚡ **性能优越** - 双向链表 LRU (O(1))，环形缓冲区，性能提升 5x+，内存优化 50%+
+- 🧠 **智能内存管理** - 全局内存监控，自动清理，内存占用估算
 - 🛠️ **高度可定制** - 支持自定义前缀、选择器、配置等
 - 📊 **性能监控** - 实时监控性能指标，可导出详细报告
 - 🎬 **丰富动画** - 6 种内置动画预设，支持自定义贝塞尔曲线
@@ -50,21 +51,19 @@ globalSizeManager.onSizeChange((event) => {
 })
 ```
 
-### Vue 项目使用
+### Vue 3 项目使用
 
 ```javascript
-import { VueSizePlugin } from '@ldesign/size/vue'
-// main.js
 import { createApp } from 'vue'
+import { createSizePlugin } from '@ldesign/size-vue'
 import App from './App.vue'
 
 const app = createApp(App)
 
 // 安装插件
-app.use(VueSizePlugin, {
-  defaultMode: 'medium',
-  autoInject: true,
-})
+app.use(createSizePlugin({
+  defaultPreset: 'medium',
+}))
 
 app.mount('#app')
 ```
@@ -72,21 +71,109 @@ app.mount('#app')
 ```vue
 <!-- 在组件中使用 -->
 <script setup>
-import { SizeControlPanel, useSize } from '@ldesign/size/vue'
+import { useSize, SizeSelector } from '@ldesign/size-vue'
 
-const { currentMode, setMode } = useSize()
+const { currentPreset, applyPreset } = useSize()
 </script>
 
 <template>
   <div>
     <!-- 使用组件 -->
-    <SizeControlPanel />
+    <SizeSelector variant="buttons" />
 
-    <!-- 使用Composition API -->
-    <div>当前模式: {{ currentMode }}</div>
+    <!-- 使用 Composition API -->
+    <div>当前模式: {{ currentPreset }}</div>
   </div>
 </template>
 ```
+
+### React 项目使用
+
+```tsx
+import { SizeProvider, useSize, SizeSelector } from '@ldesign/size-react'
+
+function App() {
+  const { currentPreset } = useSize()
+  
+  return (
+    <div>
+      <SizeSelector variant="buttons" />
+      <p>当前模式: {currentPreset}</p>
+    </div>
+  )
+}
+
+// 在根组件包裹 Provider
+function Root() {
+  return (
+    <SizeProvider defaultPreset="medium">
+      <App />
+    </SizeProvider>
+  )
+}
+```
+
+### Svelte 5 项目使用
+
+```svelte
+<script>
+  import { createSizeStore, SizeSelector } from '@ldesign/size-svelte'
+
+  const size = createSizeStore({
+    defaultPreset: 'medium'
+  })
+</script>
+
+<SizeSelector store={size} variant="buttons" />
+<p>当前模式: {size.currentPreset}</p>
+```
+
+### Solid.js 项目使用
+
+```tsx
+import { render } from 'solid-js/web'
+import { SizeProvider, useSize, SizeSelector } from '@ldesign/size-solid'
+
+function App() {
+  const { currentPreset } = useSize()
+  
+  return (
+    <div>
+      <SizeSelector variant="buttons" />
+      <p>当前模式: {currentPreset()}</p>
+    </div>
+  )
+}
+
+render(
+  () => (
+    <SizeProvider defaultPreset="medium">
+      <App />
+    </SizeProvider>
+  ),
+  document.getElementById('root')!
+)
+```
+
+## 🎨 框架支持
+
+@ldesign/size 为每个主流前端框架提供了专门优化的包：
+
+| 框架 | 包名 | 状态管理 | Provider/Plugin | 组件 |
+|------|------|----------|----------------|------|
+| **核心** | `@ldesign/size-core` | - | - | - |
+| **Vue 3** | `@ldesign/size-vue` | Composition API | Plugin | ✅ |
+| **React** | `@ldesign/size-react` | Hooks + Context | `<SizeProvider>` | ✅ |
+| **Svelte 5** | `@ldesign/size-svelte` | Runes ($state) | Store | ✅ |
+| **Solid.js** | `@ldesign/size-solid` | Signals | `<SizeProvider>` | ✅ |
+
+### 包说明
+
+- **@ldesign/size-core**: 框架无关的核心包，包含所有底层逻辑
+- **@ldesign/size-vue**: Vue 3 专用，提供 Plugin、Composables 和组件
+- **@ldesign/size-react**: React 专用，提供 Context、Hooks 和组件
+- **@ldesign/size-svelte**: Svelte 5 专用，使用最新 runes 系统
+- **@ldesign/size-solid**: Solid.js 专用，使用 Signals 提供细粒度响应式
 
 ## 🎨 尺寸模式
 
@@ -145,14 +232,36 @@ import { createResponsiveSize } from '@ldesign/size'
 createResponsiveSize({ autoApply: true })
 ```
 
-### Vue API
+### 框架特定 API
 
+#### Vue 3
 ```typescript
-import { SizeIndicator, SizeSwitcher, useSize, useSizeResponsive } from '@ldesign/size/vue'
+import { useSize, SizeSelector } from '@ldesign/size-vue'
 
-// Composition API
-const { currentMode, setMode, nextMode } = useSize()
-const { isSmall, isMedium, isLarge } = useSizeResponsive()
+const { currentPreset, applyPreset, config } = useSize()
+```
+
+#### React
+```typescript
+import { useSize, SizeSelector } from '@ldesign/size-react'
+
+const { currentPreset, applyPreset, config } = useSize()
+```
+
+#### Svelte 5
+```typescript
+import { createSizeStore, SizeSelector } from '@ldesign/size-svelte'
+
+const size = createSizeStore()
+// size.currentPreset, size.applyPreset(), size.config
+```
+
+#### Solid.js
+```typescript
+import { useSize, SizeSelector } from '@ldesign/size-solid'
+
+const { currentPreset, applyPreset, config } = useSize()
+// 注意：Solid 使用 Signals，需要调用 currentPreset() 获取值
 ```
 
 ## 🎯 使用场景
@@ -320,6 +429,13 @@ pnpm build
 ### 快速开始
 - [快速开始指南](./QUICK_START.md) - 5 分钟上手
 - [高级使用示例](./docs/examples/advanced-usage.md) - 深入学习
+
+### 框架包文档
+- [核心包文档](./packages/core/README.md) - 框架无关的核心 API
+- [Vue 3 包文档](./packages/vue/README.md) - Vue 3 专用 API 和组件
+- [React 包文档](./packages/react/README.md) - React 专用 API 和组件
+- [Svelte 5 包文档](./packages/svelte/README.md) - Svelte 5 专用 API 和组件
+- [Solid.js 包文档](./packages/solid/README.md) - Solid.js 专用 API 和组件
 
 ### 文档
 - [完整文档](./docs/README.md)
