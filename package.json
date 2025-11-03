@@ -30,14 +30,14 @@
     "url": "https://github.com/ldesign/ldesign/issues"
   },
   "scripts": {
-    "build": "pnpm --filter \"./packages/*\" run build",
+    "build": "ldesign-builder build -f esm,cjs,dts",
     "build:core": "pnpm --filter @ldesign/size-core run build",
     "build:vue": "pnpm --filter @ldesign/size-vue run build",
     "build:react": "pnpm --filter @ldesign/size-react run build",
     "build:svelte": "pnpm --filter @ldesign/size-svelte run build",
     "build:solid": "pnpm --filter @ldesign/size-solid run build",
     "build:watch": "pnpm --filter \"./packages/*\" run build:watch",
-    "dev": "pnpm --filter \"./packages/*\" run dev",
+    "dev": "ldesign-builder build -f esm,cjs,dts --watch",
     "type-check": "pnpm --filter \"./packages/*\" run type-check",
     "lint": "pnpm --filter \"./packages/*\" run lint",
     "lint:check": "pnpm --filter \"./packages/*\" run lint:check",
@@ -49,6 +49,7 @@
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test:run"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "@ldesign/builder": "workspace:*"
   }
 }
