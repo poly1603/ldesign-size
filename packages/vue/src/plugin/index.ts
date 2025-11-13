@@ -5,7 +5,7 @@
  */
 
 import type { App, ComputedRef, Ref } from 'vue'
-import { inject, ref } from 'vue'
+import { getCurrentInstance, inject, ref } from 'vue'
 import { SizeManager, type SizePreset, getLocale, type SizeLocale } from '@ldesign/size-core'
 
 /**
@@ -77,6 +77,28 @@ export interface SizePluginOptions {
    * @default true
    */
   cssVariables?: boolean
+
+  /**
+   * Register global properties ($size, $sizeManager)
+   * @default true
+   */
+  globalProperties?: boolean
+
+  /**
+   * Register global components
+   * @default true
+   */
+  globalComponents?: boolean
+
+  /**
+   * Base size value
+   */
+  baseSize?: number
+
+  /**
+   * Custom presets
+   */
+  customPresets?: any[]
 }
 
 /**
@@ -166,12 +188,17 @@ function useSmartLocale(options: SizePluginOptions): Ref<string> {
   }
 
   // 优先级2：从Vue上下文inject（如果在组件内）
-  try {
-    const injected = inject<Ref<string> | null>('app-locale', null)
-    if (injected && injected.value) {
-      return injected
+  // 只在组件上下文中调用 inject，避免警告
+  const instance = getCurrentInstance()
+  if (instance) {
+    try {
+      const injected = inject<Ref<string> | null>('app-locale', null)
+      if (injected && injected.value) {
+        return injected
+      }
     }
-  } catch { }
+    catch { }
+  }
 
   // 优先级3：创建独立的locale并监听全局事件
   const locale = ref(options.defaultLocale || 'zh-CN')
@@ -387,10 +414,13 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
     destroy,
 
     install(app: App) {
+      console.log('[createSizePlugin] install() called')
+      console.log('[createSizePlugin] app:', app)
+
       // 智能共享：如果没有传入 Ref，尝试自动共享
       if (!isRef(options.locale)) {
         // 尝试从 app context 获取共享的 locale
-        const sharedLocale = app._context?.provides?.locale as Ref<string> | undefined
+        const sharedLocale = app._context?.provides?.['app-locale'] as Ref<string> | undefined
 
         if (sharedLocale && sharedLocale.value !== undefined) {
           // 发现共享的 locale，使用它
@@ -401,7 +431,7 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
           localeCache = null
         } else {
           // 没有共享的 locale，提供自己的
-          app.provide('locale', currentLocale)
+          app.provide('app-locale', currentLocale)
         }
       }
 
@@ -428,9 +458,19 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
       // Provide size locale
       app.provide('size-locale', localeMessages)
 
-      // Add global property
-      app.config.globalProperties.$size = plugin
-      app.config.globalProperties.$sizeManager = manager
+      // Add global property (if enabled)
+      if (options.globalProperties !== false) {
+        app.config.globalProperties.$size = plugin
+        app.config.globalProperties.$sizeManager = manager
+        console.log('[createSizePlugin] Global properties added')
+        console.log('[createSizePlugin] $sizeManager:', manager)
+      }
+
+      // Register global components (if enabled)
+      if (options.globalComponents !== false) {
+        // TODO: Register global components here
+        console.log('[createSizePlugin] Global components registration skipped (not implemented yet)')
+      }
 
       // 注意：不再需要 loadSize()，因为 SizeManager 构造函数已经调用了 loadFromStorage()
       // 如果在这里再次加载会导致冲突，因为插件的 storage 和 Manager 的 storage 格式不同

@@ -30,6 +30,16 @@
       "import": "./es/index.js",
       "require": "./lib/index.cjs"
     },
+    "./adapter/*": {
+      "types": "./es/adapter/*.d.ts",
+      "import": "./es/adapter/*.js",
+      "require": "./lib/adapter/*.cjs"
+    },
+    "./constants/*": {
+      "types": "./es/constants/*.d.ts",
+      "import": "./es/constants/*.js",
+      "require": "./lib/constants/*.cjs"
+    },
     "./core/*": {
       "types": "./es/core/*.d.ts",
       "import": "./es/core/*.js",
@@ -40,10 +50,30 @@
       "import": "./es/locales/index.js",
       "require": "./lib/locales/index.cjs"
     },
+    "./locales/*": {
+      "types": "./es/locales/*.d.ts",
+      "import": "./es/locales/*.js",
+      "require": "./lib/locales/*.cjs"
+    },
+    "./modules/*": {
+      "types": "./es/modules/*.d.ts",
+      "import": "./es/modules/*.js",
+      "require": "./lib/modules/*.cjs"
+    },
+    "./presets/*": {
+      "types": "./es/presets/*.d.ts",
+      "import": "./es/presets/*.js",
+      "require": "./lib/presets/*.cjs"
+    },
     "./utils": {
       "types": "./es/utils/index.d.ts",
       "import": "./es/utils/index.js",
       "require": "./lib/utils/index.cjs"
+    },
+    "./utils/*": {
+      "types": "./es/utils/*.d.ts",
+      "import": "./es/utils/*.js",
+      "require": "./lib/utils/*.cjs"
     }
   },
   "main": "./lib/index.cjs",
@@ -83,4 +113,3 @@
     "vitest": "^2.0.0"
   }
 }
-

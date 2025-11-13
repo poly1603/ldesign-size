@@ -43,6 +43,7 @@ import { SIZE_CONFIG, UNITS } from '../constants/sizes'
 
 // 使用常量配置减少魔法数字
 const { DEFAULT_ROOT_FONT_SIZE } = SIZE_CONFIG
+const DEFAULT_FONT_SIZE = DEFAULT_ROOT_FONT_SIZE // 别名，保持向后兼容
 const { EPSILON, MAX_SIZE_POOL } = PERFORMANCE_CONFIG
 
 // 使用预定义单位常量减少重复字符串分配

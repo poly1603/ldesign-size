@@ -2,6 +2,30 @@
  * @ldesign/size-core - Framework agnostic size management system
  */
 
+// ========== 尺寸适配器（核心功能） ==========
+// 框架无关的尺寸主题管理基类
+export { BaseSizeAdapter } from './adapter/BaseSizeAdapter'
+export type {
+  SizeAdapterOptions,
+  SizeAdapterState,
+  SizePersistenceConfig,
+} from './adapter/BaseSizeAdapter'
+
+// ========== 尺寸预设主题（核心功能） ==========
+// 内置预设和预设管理工具
+export {
+  getPresetByName,
+  getPresetConfig,
+  mergePresets,
+  sizePresetThemes,
+  sortPresets,
+} from './presets/sizePresets'
+export type {
+  SizePresetConfig,
+  SizePresetName,
+  SizePresetTheme,
+} from './presets/sizePresets'
+
 // Accessibility exports
 export {
   a11y,

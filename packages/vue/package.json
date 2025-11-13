@@ -29,27 +29,50 @@
       "import": "./es/index.js",
       "require": "./lib/index.cjs"
     },
+    "./es/index.js": "./es/index.js",
     "./composables/*": {
       "types": "./es/composables/*.d.ts",
       "import": "./es/composables/*.js",
       "require": "./lib/composables/*.cjs"
     },
-    "./components/*": {
-      "types": "./es/components/*.d.ts",
-      "import": "./es/components/*.js",
-      "require": "./lib/components/*.cjs"
-    }
+    "./plugin": {
+      "types": "./es/plugin/index.d.ts",
+      "import": "./es/plugin/index.js",
+      "require": "./lib/plugin/index.cjs"
+    },
+    "./plugin/*": {
+      "types": "./es/plugin/*.d.ts",
+      "import": "./es/plugin/*.js",
+      "require": "./lib/plugin/*.cjs"
+    },
+    "./plugins": {
+      "types": "./es/plugins/index.d.ts",
+      "import": "./es/plugins/index.js",
+      "require": "./lib/plugins/index.cjs"
+    },
+    "./plugins/*": {
+      "types": "./es/plugins/*.d.ts",
+      "import": "./es/plugins/*.js",
+      "require": "./lib/plugins/*.cjs"
+    },
+    "./es/components/SizePresetPicker.vue.css": "./es/components/SizePresetPicker.vue.css",
+    "./es/components/SizeSwitcher.vue.css": "./es/components/SizeSwitcher.vue.css",
+    "./es/index.css": "./es/index.css",
+    "./lib/components/SizePresetPicker.vue.css": "./lib/components/SizePresetPicker.vue.css",
+    "./lib/components/SizeSwitcher.vue.css": "./lib/components/SizeSwitcher.vue.css",
+    "./lib/index.css": "./lib/index.css"
   },
   "main": "./lib/index.cjs",
   "module": "./es/index.js",
   "types": "./es/index.d.ts",
+  "unpkg": "./dist/index.min.js",
+  "jsdelivr": "./dist/index.min.js",
   "files": [
     "README.md",
     "LICENSE",
     "package.json",
     "es",
-    "lib",
-    "dist"
+    "lib"
   ],
   "scripts": {
     "build": "ldesign-builder build",
@@ -64,12 +87,12 @@
     "test:coverage": "vitest run --coverage",
     "clean": "rimraf es lib dist coverage"
   },
+  "dependencies": {
+    "lucide-vue-next": "^0.542.0"
+  },
   "peerDependencies": {
     "vue": "^3.3.0",
     "@ldesign/size-core": "workspace:*"
-  },
-  "dependencies": {
-    "lucide-vue-next": "^0.542.0"
   },
   "devDependencies": {
     "@ldesign/builder": "workspace:*",
@@ -88,4 +111,3 @@
     "vue-tsc": "^2.2.12"
   }
 }
-
