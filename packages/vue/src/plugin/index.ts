@@ -417,6 +417,32 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
       console.log('[createSizePlugin] install() called')
       console.log('[createSizePlugin] app:', app)
 
+      // ========== 样式注入 ==========
+      // 动态注入组件样式，确保在所有环境下（有/无 alias、dev/build）样式都能正常加载
+      if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+        const styleId = 'ldesign-size-vue-styles'
+        // 检查是否已经注入，避免重复
+        if (!document.getElementById(styleId)) {
+          try {
+            const link = document.createElement('link')
+            link.id = styleId
+            link.rel = 'stylesheet'
+            // 使用 import.meta.url 计算 CSS 文件的绝对路径
+            // 这样无论是从源码还是构建产物导入，都能正确找到 CSS 文件
+            const cssUrl = new URL('../index.css', import.meta.url).href
+            link.href = cssUrl
+            document.head.appendChild(link)
+            console.log('[createSizePlugin] Styles injected:', cssUrl)
+          }
+          catch (error) {
+            console.warn('[createSizePlugin] Failed to inject styles:', error)
+          }
+        }
+        else {
+          console.log('[createSizePlugin] Styles already injected, skipping')
+        }
+      }
+
       // 智能共享：如果没有传入 Ref，尝试自动共享
       if (!isRef(options.locale)) {
         // 尝试从 app context 获取共享的 locale

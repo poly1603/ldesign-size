@@ -1,0 +1,79 @@
+/**
+ * 尺寸预设选择器样式
+ */
+.size-preset-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.preset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.preset-item:hover {
+  background: #e8e8e8;
+  transform: translateX(4px);
+}
+
+.preset-item.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.preset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.preset-description {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preset-config {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.config-item {
+  font-size: 12px;
+  color: #999;
+  font-family: 'Courier New', monospace;
+}
+
+.preset-item.active .preset-name {
+  color: #1890ff;
+}
+
+.preset-item.active .config-item {
+  color: #1890ff;
+}
+

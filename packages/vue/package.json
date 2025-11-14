@@ -22,60 +22,84 @@
     "url": "https://github.com/ldesign/ldesign/issues"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "*.vue"
+  ],
   "exports": {
     ".": {
-      "types": "./es/index.d.ts",
-      "import": "./es/index.js",
-      "require": "./lib/index.cjs"
+      "types": "./esm/index.d.ts",
+      "import": "./esm/index.js",
+      "require": "./cjs/index.cjs"
     },
-    "./es/index.js": "./es/index.js",
     "./composables/*": {
-      "types": "./es/composables/*.d.ts",
-      "import": "./es/composables/*.js",
-      "require": "./lib/composables/*.cjs"
+      "types": "./esm/composables/*.d.ts",
+      "import": "./esm/composables/*.js",
+      "require": "./cjs/composables/*.cjs"
     },
     "./plugin": {
-      "types": "./es/plugin/index.d.ts",
-      "import": "./es/plugin/index.js",
-      "require": "./lib/plugin/index.cjs"
+      "types": "./esm/plugin/index.d.ts",
+      "import": "./esm/plugin/index.js",
+      "require": "./cjs/plugin/index.cjs"
     },
     "./plugin/*": {
-      "types": "./es/plugin/*.d.ts",
-      "import": "./es/plugin/*.js",
-      "require": "./lib/plugin/*.cjs"
+      "types": "./esm/plugin/*.d.ts",
+      "import": "./esm/plugin/*.js",
+      "require": "./cjs/plugin/*.cjs"
     },
     "./plugins": {
-      "types": "./es/plugins/index.d.ts",
-      "import": "./es/plugins/index.js",
-      "require": "./lib/plugins/index.cjs"
+      "types": "./esm/plugins/index.d.ts",
+      "import": "./esm/plugins/index.js",
+      "require": "./cjs/plugins/index.cjs"
     },
     "./plugins/*": {
-      "types": "./es/plugins/*.d.ts",
-      "import": "./es/plugins/*.js",
-      "require": "./lib/plugins/*.cjs"
+      "types": "./esm/plugins/*.d.ts",
+      "import": "./esm/plugins/*.js",
+      "require": "./cjs/plugins/*.cjs"
     },
-    "./es/components/SizePresetPicker.vue.css": "./es/components/SizePresetPicker.vue.css",
-    "./es/components/SizeSwitcher.vue.css": "./es/components/SizeSwitcher.vue.css",
-    "./es/index.css": "./es/index.css",
-    "./lib/components/SizePresetPicker.vue.css": "./lib/components/SizePresetPicker.vue.css",
-    "./lib/components/SizeSwitcher.vue.css": "./lib/components/SizeSwitcher.vue.css",
-    "./lib/index.css": "./lib/index.css"
+    "./size-preset-picker": {
+      "types": "./esm/size-preset-picker/index.d.ts",
+      "import": "./esm/size-preset-picker/index.js",
+      "require": "./cjs/size-preset-picker/index.cjs"
+    },
+    "./size-preset-picker/*": {
+      "types": "./esm/size-preset-picker/*.d.ts",
+      "import": "./esm/size-preset-picker/*.js",
+      "require": "./cjs/size-preset-picker/*.cjs"
+    },
+    "./size-switcher": {
+      "types": "./esm/size-switcher/index.d.ts",
+      "import": "./esm/size-switcher/index.js",
+      "require": "./cjs/size-switcher/index.cjs"
+    },
+    "./size-switcher/*": {
+      "types": "./esm/size-switcher/*.d.ts",
+      "import": "./esm/size-switcher/*.js",
+      "require": "./cjs/size-switcher/*.cjs"
+    },
+    "./cjs/components/SizePresetPicker.vue.css": "./cjs/components/SizePresetPicker.vue.css",
+    "./cjs/components/SizeSwitcher.vue.css": "./cjs/components/SizeSwitcher.vue.css",
+    "./cjs/index.css": "./cjs/index.css",
+    "./cjs/size-preset-picker/index.css": "./cjs/size-preset-picker/index.css",
+    "./cjs/size-switcher/index.css": "./cjs/size-switcher/index.css",
+    "./dist/index.css": "./dist/index.css",
+    "./dist/index.min.css": "./dist/index.min.css"
   },
-  "main": "./lib/index.cjs",
-  "module": "./es/index.js",
-  "types": "./es/index.d.ts",
+  "main": "./cjs/index.cjs",
+  "module": "./esm/index.js",
+  "types": "./esm/index.d.ts",
   "unpkg": "./dist/index.min.js",
   "jsdelivr": "./dist/index.min.js",
   "files": [
     "README.md",
     "LICENSE",
     "package.json",
-    "es",
-    "lib"
+    "esm",
+    "cjs",
+    "dist"
   ],
   "scripts": {
-    "build": "ldesign-builder build",
+    "build": "ldesign-builder build --config builder.config.ts",
     "build:watch": "ldesign-builder build --watch",
     "dev": "ldesign-builder build --watch",
     "type-check": "vue-tsc --noEmit",
@@ -85,7 +109,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rimraf es lib dist coverage"
+    "clean": "rimraf es esm cjs dist lib coverage"
   },
   "dependencies": {
     "lucide-vue-next": "^0.542.0"
