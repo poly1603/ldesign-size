@@ -6,10 +6,11 @@
  * @module plugins/engine-plugin
  */
 
-import type { Plugin } from '@ldesign/engine-core/types'
+import type { Plugin, SizePluginAPI } from '@ldesign/engine-core/types'
 import { BaseSizeAdapter } from '@ldesign/size-core'
 import type { SizeAdapterOptions, SizePresetTheme } from '@ldesign/size-core'
 import type { SizePresetName } from '@ldesign/size-core'
+import { SIZE_EVENTS } from '@ldesign/engine-core/constants/events'
 import { createSizePlugin } from '../plugin/index'
 import { SIZE_SYMBOL } from '../constants'
 
@@ -171,6 +172,27 @@ export function createSizeEnginePlugin(
         engine.state.set(`plugins.${name}`, sizeAdapter)
       }
 
+      // 注册 Size API 到 API 注册表
+      if ((engine as any)?.api) {
+        const sizeAPI: SizePluginAPI = {
+          name: 'size',
+          version: version || '1.0.0',
+          applyPreset: (preset: string) => sizeAdapter.applyPreset(preset),
+          getCurrentPreset: () => sizeAdapter.getCurrentPreset(),
+          setBaseSize: (size: number) => sizeAdapter.setBaseSize(size),
+          getBaseSize: () => sizeAdapter.getBaseSize(),
+          setScale: (scale: number) => sizeAdapter.setScale(scale),
+          getScale: () => sizeAdapter.getScale(),
+          getPresets: () => sizeAdapter.getAvailablePresets(),
+          compute: (level: number) => sizeAdapter.compute(level),
+          getState: () => sizeAdapter.getState(),
+        };
+        (engine as any).api.register(sizeAPI)
+        if (debug) {
+          console.log('[Size Engine Plugin] Size API registered to API registry')
+        }
+      }
+
       // 3. 安装到 Vue 应用
       const app = engine?.getApp?.() || context?.framework?.app
 
@@ -238,6 +260,11 @@ export function createSizeEnginePlugin(
       // 从 Engine 状态中移除
       if (engine.state) {
         engine.state.delete(`plugins.${name}`)
+      }
+
+      // 注销 Size API
+      if ((engine as any)?.api) {
+        (engine as any).api.unregister('size')
       }
 
       if (debug) {
