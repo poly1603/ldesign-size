@@ -24,7 +24,9 @@
   "type": "module",
   "sideEffects": [
     "*.css",
-    "*.vue"
+    "*.vue",
+    "**/*.css",
+    "**/style/**"
   ],
   "exports": {
     ".": {
@@ -77,6 +79,7 @@
       "import": "./esm/size-switcher/*.js",
       "require": "./cjs/size-switcher/*.cjs"
     },
+    "./style": "./dist/index.css",
     "./cjs/components/SizePresetPicker.vue.css": "./cjs/components/SizePresetPicker.vue.css",
     "./cjs/components/SizeSwitcher.vue.css": "./cjs/components/SizeSwitcher.vue.css",
     "./cjs/index.css": "./cjs/index.css",
