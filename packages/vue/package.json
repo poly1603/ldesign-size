@@ -22,12 +22,7 @@
     "url": "https://github.com/ldesign/ldesign/issues"
   },
   "type": "module",
-  "sideEffects": [
-    "*.css",
-    "*.vue",
-    "**/*.css",
-    "**/style/**"
-  ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./esm/index.d.ts",
@@ -59,34 +54,7 @@
       "import": "./esm/plugins/*.js",
       "require": "./cjs/plugins/*.cjs"
     },
-    "./size-preset-picker": {
-      "types": "./esm/size-preset-picker/index.d.ts",
-      "import": "./esm/size-preset-picker/index.js",
-      "require": "./cjs/size-preset-picker/index.cjs"
-    },
-    "./size-preset-picker/*": {
-      "types": "./esm/size-preset-picker/*.d.ts",
-      "import": "./esm/size-preset-picker/*.js",
-      "require": "./cjs/size-preset-picker/*.cjs"
-    },
-    "./size-switcher": {
-      "types": "./esm/size-switcher/index.d.ts",
-      "import": "./esm/size-switcher/index.js",
-      "require": "./cjs/size-switcher/index.cjs"
-    },
-    "./size-switcher/*": {
-      "types": "./esm/size-switcher/*.d.ts",
-      "import": "./esm/size-switcher/*.js",
-      "require": "./cjs/size-switcher/*.cjs"
-    },
-    "./style": "./dist/index.css",
-    "./cjs/components/SizePresetPicker.vue.css": "./cjs/components/SizePresetPicker.vue.css",
-    "./cjs/components/SizeSwitcher.vue.css": "./cjs/components/SizeSwitcher.vue.css",
-    "./cjs/index.css": "./cjs/index.css",
-    "./cjs/size-preset-picker/index.css": "./cjs/size-preset-picker/index.css",
-    "./cjs/size-switcher/index.css": "./cjs/size-switcher/index.css",
-    "./dist/index.css": "./dist/index.css",
-    "./dist/index.min.css": "./dist/index.min.css"
+    "./style": "./dist/index.css"
   },
   "main": "./cjs/index.cjs",
   "module": "./esm/index.js",
@@ -102,7 +70,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "ldesign-builder build --config builder.config.ts",
+    "build": "ldesign-builder build",
     "build:watch": "ldesign-builder build --watch",
     "dev": "ldesign-builder build --watch",
     "type-check": "vue-tsc --noEmit",
@@ -112,7 +80,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rimraf es esm cjs dist lib coverage"
+    "clean": "rimraf esm cjs dist coverage"
   },
   "dependencies": {
     "lucide-vue-next": "^0.542.0"
