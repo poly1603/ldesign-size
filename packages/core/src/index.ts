@@ -209,6 +209,24 @@ export {
   modularScaleRatios
 } from './core/FluidSize'
 
+// Advanced Responsive System exports
+export {
+  AdvancedResponsiveSystem,
+  createResponsiveSystem,
+  responsive
+} from './modules/AdvancedResponsiveSystem'
+
+export type {
+  AdvancedBreakpoint,
+  ContainerQuery,
+  ContainerQueryType,
+  LayoutConfig,
+  LayoutType,
+  ResponsiveSizeConfig,
+  SizeStrategy,
+  VisibilityConfig
+} from './modules/AdvancedResponsiveSystem'
+
 // Size class exports
 export {
   em,
