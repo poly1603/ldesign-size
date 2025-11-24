@@ -60,6 +60,11 @@
       "import": "./es/modules/*.js",
       "require": "./lib/modules/*.cjs"
     },
+    "./optimizations/*": {
+      "types": "./es/optimizations/*.d.ts",
+      "import": "./es/optimizations/*.js",
+      "require": "./lib/optimizations/*.cjs"
+    },
     "./presets/*": {
       "types": "./es/presets/*.d.ts",
       "import": "./es/presets/*.js",

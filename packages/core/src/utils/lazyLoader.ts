@@ -95,6 +95,10 @@ export function clearCache(moduleId?: string): void {
 
 /**
  * 创建懒加载代理
+ *
+ * @param target - 模块加载函数
+ * @param moduleId - 模块标识符
+ * @returns 懒加载代理对象
  */
 export function createLazyProxy<T extends object>(
   target: () => Promise<T>,
@@ -102,27 +106,55 @@ export function createLazyProxy<T extends object>(
 ): T {
   let instance: T | null = null;
   let loading = false;
+  let loadError: Error | null = null;
 
   return new Proxy({} as T, {
     get(_, prop) {
-      if (!instance && !loading) {
+      if (!instance && !loading && !loadError) {
         loading = true;
         lazyLoad(moduleId, target).then((module) => {
           instance = module;
           loading = false;
-        }).catch(() => {
-          // 加载失败时重置状态，避免永久卡死
+          loadError = null;
+        }).catch((error: Error) => {
+          // 保存错误信息,避免永久卡死
           loading = false;
+          loadError = error;
+
+          // 在开发模式下输出详细错误
+          if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error(
+              `[LazyLoader] 模块 "${moduleId}" 加载失败:`,
+              '\n错误:', error.message,
+              '\n堆栈:', error.stack,
+              '\n建议: 检查模块路径是否正确,或网络连接是否正常'
+            );
+          }
         });
       }
-      
+
       if (instance) {
         return (instance as any)[prop];
       }
-      
-      // 返回一个占位函数
+
+      // 如果加载失败,抛出详细错误
+      if (loadError) {
+        throw new Error(
+          `模块 "${moduleId}" 加载失败: ${loadError.message}\n` +
+          `尝试访问属性: ${String(prop)}\n` +
+          `建议: 请检查模块是否存在,或稍后重试`
+        );
+      }
+
+      // 返回一个占位函数(仅在加载中时)
       return () => {
-        console.warn(`Module ${moduleId} is still loading`);
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+          console.warn(
+            `[LazyLoader] 模块 "${moduleId}" 正在加载中...`,
+            `\n尝试访问: ${String(prop)}`,
+            `\n建议: 等待模块加载完成后再调用`
+          );
+        }
         return Promise.resolve();
       };
     }

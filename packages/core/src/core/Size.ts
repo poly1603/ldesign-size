@@ -807,6 +807,235 @@ export class Size {
     const maxStr = new Size(max).toString();
     return `clamp(${minStr}, ${prefStr}, ${maxStr})`;
   }
+
+  /**
+   * 批量转换尺寸数组
+   *
+   * 性能优化: 使用对象池批量处理,减少内存分配
+   *
+   * @param inputs - 尺寸输入数组
+   * @param targetUnit - 目标单位
+   * @param options - 转换选项
+   * @returns 转换后的尺寸数组
+   *
+   * @example
+   * ```ts
+   * const sizes = Size.convertBatch([16, 24, 32], 'rem')
+   * // => [Size(1rem), Size(1.5rem), Size(2rem)]
+   * ```
+   */
+  static convertBatch(
+    inputs: SizeInput[],
+    targetUnit: SizeUnit,
+    options?: SizeCalculationOptions
+  ): Size[] {
+    return inputs.map(input => {
+      const size = new Size(input, options?.rootFontSize)
+      return size.to(targetUnit, options)
+    })
+  }
+
+  /**
+   * 生成尺寸比例序列
+   *
+   * 根据基础尺寸和比例因子生成一系列尺寸
+   *
+   * @param base - 基础尺寸
+   * @param ratio - 比例因子
+   * @param count - 生成数量
+   * @returns 尺寸数组
+   *
+   * @example
+   * ```ts
+   * // 生成模块化比例尺寸 (1.5倍比例)
+   * const scale = Size.generateScale(16, 1.5, 5)
+   * // => [16px, 24px, 36px, 54px, 81px]
+   * ```
+   */
+  static generateScale(base: SizeInput, ratio: number, count: number): Size[] {
+    const baseSize = new Size(base)
+    const sizes: Size[] = [baseSize.clone()]
+
+    for (let i = 1; i < count; i++) {
+      const scaleFactor = Math.pow(ratio, i)
+      sizes.push(baseSize.scale(scaleFactor))
+    }
+
+    return sizes
+  }
+
+  /**
+   * 获取对象池统计信息
+   *
+   * 返回尺寸对象池的详细统计信息,包括池大小、命中率等。
+   *
+   * @returns 对象池统计信息
+   * @example
+   * ```ts
+   * const stats = Size.getPoolStats()
+   * console.log(`池大小: ${stats.poolSize}`)
+   * console.log(`命中率: ${(stats.hitRate * 100).toFixed(2)}%`)
+   * ```
+   */
+  static getPoolStats() {
+    return SizePool.getInstance().getStats()
+  }
+
+  /**
+   * 检查对象池健康状态
+   *
+   * 在开发模式下检查对象池的健康状态,如果发现潜在问题会输出警告。
+   *
+   * @example
+   * ```ts
+   * if (import.meta.env.DEV) {
+   *   setInterval(() => Size.checkPoolHealth(), 60000)
+   * }
+   * ```
+   */
+  static checkPoolHealth(): void {
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      const stats = this.getPoolStats()
+      const total = stats.hits + stats.misses
+
+      if (total > 100 && stats.hitRate < 0.5) {
+        console.warn(
+          `[Size] 对象池命中率较低: ${(stats.hitRate * 100).toFixed(2)}%`,
+          '\n建议: 考虑增加池大小或检查使用模式',
+        )
+      }
+
+      if (stats.created > MAX_SIZE_POOL * 3) {
+        console.warn(
+          `[Size] 已创建对象数量较多: ${stats.created}`,
+          '\n建议: 检查是否有对象未调用 release() 方法',
+        )
+      }
+
+      const utilization = (stats.poolSize / MAX_SIZE_POOL) * 100
+      if (utilization > 90) {
+        console.warn(
+          `[Size] 对象池利用率过高: ${utilization.toFixed(2)}%`,
+          '\n建议: 考虑增加 MAX_SIZE_POOL 常量的值',
+        )
+      }
+    }
+  }
+
+  // ============================================
+  // Instance Methods
+  // ============================================
+
+  /**
+   * 获取尺寸信息摘要
+   *
+   * @returns 尺寸信息对象
+   *
+   * @example
+   * ```ts
+   * const size = new Size('1.5rem')
+   * const info = size.getInfo()
+   * console.log(info)
+   * // {
+   * //   value: 1.5,
+   * //   unit: 'rem',
+   * //   pixels: 24,
+   * //   formatted: '1.5rem'
+   * // }
+   * ```
+   */
+  getInfo(): {
+    value: number
+    unit: SizeUnit
+    pixels: number
+    formatted: string
+  } {
+    return {
+      value: this.value,
+      unit: this.unit,
+      pixels: this.toPixels(),
+      formatted: this.toString(),
+    }
+  }
+
+  /**
+   * 检查尺寸是否在指定范围内
+   *
+   * @param min - 最小值
+   * @param max - 最大值
+   * @returns 是否在范围内
+   *
+   * @example
+   * ```ts
+   * const size = new Size(20)
+   * console.log(size.inRange(10, 30)) // true
+   * console.log(size.inRange(25, 50)) // false
+   * ```
+   */
+  inRange(min: SizeInput, max: SizeInput): boolean {
+    const minSize = new Size(min, this.rootFontSize)
+    const maxSize = new Size(max, this.rootFontSize)
+    return this.gte(minSize) && this.lte(maxSize)
+  }
+
+  /**
+   * 获取调试信息
+   *
+   * 返回详细的尺寸调试信息
+   *
+   * @returns 调试信息对象
+   *
+   * @example
+   * ```ts
+   * const size = new Size('1.5rem')
+   * console.log(size.debug())
+   * // {
+   * //   value: 1.5,
+   * //   unit: 'rem',
+   * //   rootFontSize: 16,
+   * //   pixels: 24,
+   * //   rem: 1.5,
+   * //   formatted: '1.5rem',
+   * //   isValid: true
+   * // }
+   * ```
+   */
+  debug(): {
+    value: number
+    unit: SizeUnit
+    rootFontSize: number
+    pixels: number
+    rem: number
+    formatted: string
+    isValid: boolean
+  } {
+    return {
+      value: this.value,
+      unit: this.unit,
+      rootFontSize: this.rootFontSize,
+      pixels: this.toPixels(),
+      rem: this.toRem(),
+      formatted: this.toString(),
+      isValid: this.value >= 0 && Number.isFinite(this.value),
+    }
+  }
+
+  /**
+   * 释放尺寸对象回对象池
+   *
+   * 当不再需要使用此尺寸对象时,调用此方法将其释放回对象池以供复用
+   * 注意: 释放后不应再使用此对象
+   *
+   * @example
+   * ```ts
+   * const size = new Size(16)
+   * // 使用尺寸...
+   * size.release() // 释放回对象池
+   * ```
+   */
+  release(): void {
+    SizePool.getInstance().release(this)
+  }
 }
 
 // 初始化常用值缓存

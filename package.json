@@ -42,9 +42,11 @@
     "lint": "pnpm --filter \"./packages/*\" run lint",
     "lint:check": "pnpm --filter \"./packages/*\" run lint:check",
     "lint:fix": "pnpm --filter \"./packages/*\" run lint:fix",
-    "test": "pnpm --filter \"./packages/*\" run test",
-    "test:run": "pnpm --filter \"./packages/*\" run test:run",
-    "test:coverage": "pnpm --filter \"./packages/*\" run test:coverage",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "clean": "pnpm --filter \"./packages/*\" run clean"
   },
   "devDependencies": {
