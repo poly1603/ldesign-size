@@ -34,6 +34,7 @@ import {
 } from '../utils'
 import { PERFORMANCE_CONFIG } from '../constants/performance'
 import { SIZE_CONFIG, UNITS } from '../constants/sizes'
+import { SizeOperationCache } from '../utils/operation-cache'
 
 /**
  * Size 对象池，减少频繁创建对象的开销
@@ -248,6 +249,9 @@ export class Size {
   private _cachedPixels?: number; // 缓存像素值
   private _cachedRem?: number; // 缓存rem值
 
+  // Size operation cache for expensive calculations
+  private static operationCache = SizeOperationCache.getInstance()
+
   // 使用getter/setter访问标记
   get _isPooled(): boolean {
     return (this._flags & FLAG_POOLED) !== 0;
@@ -457,11 +461,16 @@ export class Size {
   // ============================================
 
   /**
-   * Scale the size by a factor
+   * Scale the size by a factor (with cache optimization)
    */
   scale(factor: ScaleFactor): Size {
+    const cached = Size.operationCache.cached<Size>(this, 'scale', factor)
+    if (cached) return cached
+
     const scaled = scaleSize(this._value, factor);
-    return new Size(scaled, this._rootFontSize);
+    const result = new Size(scaled, this._rootFontSize);
+    Size.operationCache.store(this, 'scale', result, factor)
+    return result;
   }
 
   /**
@@ -479,9 +488,12 @@ export class Size {
   }
 
   /**
-   * Add another size
+   * Add another size (with cache optimization)
    */
   add(other: SizeInput): Size {
+    const cached = Size.operationCache.cached<Size>(this, 'add', other)
+    if (cached) return cached
+
     // 使用池化对象减少内存分配
     const otherSize = this._isPooled
       ? SizePool.getInstance().acquire(other, this._rootFontSize)
@@ -490,15 +502,21 @@ export class Size {
     if (this._isPooled) {
       otherSize.dispose();
     }
-    return this._isPooled
+    const finalResult = this._isPooled
       ? SizePool.getInstance().acquire(result, this._rootFontSize)
       : new Size(result, this._rootFontSize);
+
+    Size.operationCache.store(this, 'add', finalResult, other)
+    return finalResult;
   }
 
   /**
-   * Subtract another size
+   * Subtract another size (with cache optimization)
    */
   subtract(other: SizeInput): Size {
+    const cached = Size.operationCache.cached<Size>(this, 'subtract', other)
+    if (cached) return cached
+
     // 使用池化对象减少内存分配
     const otherSize = this._isPooled
       ? SizePool.getInstance().acquire(other, this._rootFontSize)
@@ -507,9 +525,12 @@ export class Size {
     if (this._isPooled) {
       otherSize.dispose();
     }
-    return this._isPooled
+    const finalResult = this._isPooled
       ? SizePool.getInstance().acquire(result, this._rootFontSize)
       : new Size(result, this._rootFontSize);
+
+    Size.operationCache.store(this, 'subtract', finalResult, other)
+    return finalResult;
   }
 
   /**
@@ -547,11 +568,16 @@ export class Size {
   }
 
   /**
-   * Round to specified precision
+   * Round to specified precision (with cache optimization)
    */
   round(precision = 2): Size {
+    const cached = Size.operationCache.cached<Size>(this, 'round', precision)
+    if (cached) return cached
+
     const rounded = roundSize(this._value, precision);
-    return new Size(rounded, this._rootFontSize);
+    const result = new Size(rounded, this._rootFontSize);
+    Size.operationCache.store(this, 'round', result, precision)
+    return result;
   }
 
   /**
@@ -920,6 +946,54 @@ export class Size {
         )
       }
     }
+  }
+
+  /**
+   * 获取操作缓存统计信息
+   *
+   * 返回尺寸操作缓存的详细统计信息，包括命中率、缓存大小等。
+   *
+   * @returns 操作缓存统计信息
+   * @example
+   * ```ts
+   * const stats = Size.getOperationCacheStats()
+   * console.log(`缓存大小: ${stats.size}/${stats.capacity}`)
+   * console.log(`命中率: ${(stats.hitRate * 100).toFixed(2)}%`)
+   * ```
+   */
+  static getOperationCacheStats() {
+    return this.operationCache.getStats()
+  }
+
+  /**
+   * 预热操作缓存
+   *
+   * 预先计算常用尺寸操作，提升首次访问性能。
+   * 适合在应用初始化时调用。
+   *
+   * @param sizes - 要预热的尺寸数组
+   * @example
+   * ```ts
+   * const baseSizes = [
+   *   new Size(16),
+   *   new Size('1rem'),
+   *   new Size('24px')
+   * ]
+   * Size.preheatCache(baseSizes)
+   * ```
+   */
+  static preheatCache(sizes: Size[]): void {
+    this.operationCache.preheat(sizes)
+  }
+
+  /**
+   * 清理静态资源
+   *
+   * 清空所有缓存和对象池。用于测试或释放内存。
+   */
+  static cleanup(): void {
+    SizePool.getInstance().clear()
+    this.operationCache.clear()
   }
 
   // ============================================

@@ -1,19 +1,18 @@
 /**
- * Size包响应式计算优化系统
- * 
+ * Size包响应式计算优化
+ *
  * 功能特性：
  * 1. 智能缓存计算结果，避免重复计算
  * 2. 增量更新机制，只计算变化的部分
  * 3. 批量计算优化，减少重排重绘
  * 4. 虚拟化支持，大量元素场景优化
  * 5. 防抖节流，减少计算频率
- * 
+ *
  * 性能优势：
  * - 减少70%的重复计算
  * - 降低50%的DOM操作
  * - 提升大数据场景渲染速度3-5倍
- * 
- * @author LDesign优化团队
+ *
  * @version 2.0.0
  */
 
@@ -58,9 +57,9 @@ interface VirtualizationConfig {
 }
 
 /**
- * 响应式计算优化器配置
+ * 计算优化器配置
  */
-export interface ResponsiveComputeConfig {
+export interface ComputeConfig {
   cacheLimit?: number;
   cacheExpiry?: number;
   debounceDelay?: number;
@@ -71,16 +70,16 @@ export interface ResponsiveComputeConfig {
 }
 
 /**
- * 响应式计算优化器
+ * 计算优化器
  */
-export class ResponsiveComputeOptimizer {
-  private static instance: ResponsiveComputeOptimizer;
+export class ComputeOptimizer {
+  private static instance: ComputeOptimizer;
   private cache: Map<string, ComputeCache> = new Map();
   private dirtySet: Set<string> = new Set();
   private batchQueue: BatchComputeTask[] = [];
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private throttleTimestamps: Map<string, number> = new Map();
-  private config: Required<ResponsiveComputeConfig>;
+  private config: Required<ComputeConfig>;
   private stats = {
     cacheHits: 0,
     cacheMisses: 0,
@@ -89,7 +88,7 @@ export class ResponsiveComputeOptimizer {
     incrementalUpdates: 0,
   };
 
-  private constructor(config: ResponsiveComputeConfig = {}) {
+  private constructor(config: ComputeConfig = {}) {
     this.config = {
       cacheLimit: config.cacheLimit ?? 1000,
       cacheExpiry: config.cacheExpiry ?? 5 * 60 * 1000,
@@ -110,11 +109,11 @@ export class ResponsiveComputeOptimizer {
     };
   }
 
-  public static getInstance(config?: ResponsiveComputeConfig): ResponsiveComputeOptimizer {
-    if (!ResponsiveComputeOptimizer.instance) {
-      ResponsiveComputeOptimizer.instance = new ResponsiveComputeOptimizer(config);
+  public static getInstance(config?: ComputeConfig): ComputeOptimizer {
+    if (!ComputeOptimizer.instance) {
+      ComputeOptimizer.instance = new ComputeOptimizer(config);
     }
-    return ResponsiveComputeOptimizer.instance;
+    return ComputeOptimizer.instance;
   }
 
   public compute<T>(key: string, deps: any[], computeFn: () => T): T {
@@ -383,17 +382,17 @@ export class ResponsiveComputeOptimizer {
   }
 }
 
-export function createResponsiveComputeOptimizer(
-  config?: ResponsiveComputeConfig
-): ResponsiveComputeOptimizer {
-  return ResponsiveComputeOptimizer.getInstance(config);
+export function createComputeOptimizer(
+  config?: ComputeConfig
+): ComputeOptimizer {
+  return ComputeOptimizer.getInstance(config);
 }
 
 export function createCachedCompute<T>(
   key: string,
   computeFn: (...args: any[]) => T
 ): (...args: any[]) => T {
-  const optimizer = ResponsiveComputeOptimizer.getInstance();
+  const optimizer = ComputeOptimizer.getInstance();
   return (...args: any[]) => {
     return optimizer.compute(key, args, () => computeFn(...args));
   };

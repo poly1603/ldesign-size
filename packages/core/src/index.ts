@@ -239,6 +239,13 @@ export {
   vw
 } from './core/Size'
 
+// Size operation cache exports
+export {
+  SizeOperationCache,
+  sizeCache,
+  cached
+} from './utils/operation-cache'
+
 // Size Analyzer exports - 懒加载（调试工具通常不需要立即加载）
 export type {
   PerformanceMetrics,
@@ -385,6 +392,23 @@ export type {
 // Constants exports
 export { PERFORMANCE_CONFIG } from './constants/performance'
 export { SIZE_CONFIG, UNITS, SIZE_MULTIPLIERS, COMMON_SIZES, CSS_IDENTIFIERS } from './constants/sizes'
+
+// Optimizations exports
+export {
+  ResponsiveComputeOptimizer,
+  createResponsiveComputeOptimizer,
+  createCachedCompute,
+  EnhancedResponsiveManager,
+  createEnhancedResponsiveManager,
+  enhancedResponsive
+} from './optimizations'
+
+export type {
+  ResponsiveComputeConfig,
+  Breakpoint,
+  ContainerQueryConfig,
+  ResponsiveConfig
+} from './optimizations'
 
 // Version
 export const version = '0.2.0'

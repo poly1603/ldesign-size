@@ -77,8 +77,8 @@
     "./cjs/components/SizePresetPicker.vue.css": "./cjs/components/SizePresetPicker.vue.css",
     "./cjs/components/SizeSwitcher.vue.css": "./cjs/components/SizeSwitcher.vue.css",
     "./cjs/index.css": "./cjs/index.css",
-    "./cjs/size-preset-picker/size-preset-picker.css": "./cjs/size-preset-picker/size-preset-picker.css",
-    "./cjs/size-switcher/index.css": "./cjs/size-switcher/index.css",
+    "./cjs/size-preset-picker/index.css": "./cjs/size-preset-picker/index.css",
+    "./cjs/size-switcher/size-switcher.css": "./cjs/size-switcher/size-switcher.css",
     "./dist/index.css": "./dist/index.css",
     "./dist/index.min.css": "./dist/index.min.css"
   },
