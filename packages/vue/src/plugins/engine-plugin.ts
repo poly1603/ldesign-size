@@ -141,7 +141,7 @@ export function createSizeEnginePlugin(
     globalComponents,
     baseSize: resolvedBaseSize,
     customPresets,
-    persistence,
+    persistence: persistence?.enabled ?? false,
     ...adapterOptions,
   })
 
@@ -183,7 +183,7 @@ export function createSizeEnginePlugin(
           getBaseSize: () => sizeAdapter.getBaseSize(),
           setScale: (scale: number) => sizeAdapter.setScale(scale),
           getScale: () => sizeAdapter.getScale(),
-          getPresets: () => sizeAdapter.getAvailablePresets(),
+          getPresets: () => sizeAdapter.getPresets(),
           compute: (level: number) => sizeAdapter.compute(level),
           getState: () => sizeAdapter.getState(),
         };

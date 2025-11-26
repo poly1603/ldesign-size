@@ -486,7 +486,7 @@ export const requestIdleCallback =
     : (callback: IdleRequestCallback) => setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1);
 
 // 导出缓存管理器
-export { CacheManager, LRUCache, CacheType, globalCacheManager } from './CacheManager'
+export { CacheManager, CacheType, globalCacheManager } from './CacheManager'
 export type { } from './CacheManager'
 
 // 导出错误处理
@@ -511,6 +511,13 @@ export * from './memoryOptimizer'
 
 // 导出性能诊断工具
 export * from './performanceDiagnostics'
+
+// 导出独立的 LRU 缓存实现（优化版本）
+export { LRUCache as LRUCacheOptimized } from './LRUCache'
+
+// 导出内存监测工具
+export { MemoryMonitor, getGlobalMemoryMonitor, destroyGlobalMemoryMonitor } from './MemoryMonitor'
+export type { MemoryInfo, MemoryMonitorOptions, CleanupHandler } from './MemoryMonitor'
 
 /**
  * Optimize CSS variable generation with deduplication

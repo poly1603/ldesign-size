@@ -192,6 +192,17 @@ export {
   removeCSS
 } from './core/cssGenerator'
 
+// CSS Template Engine exports (优化版本)
+export {
+  CSSTemplateEngine,
+  getGlobalCSSTemplateEngine,
+  destroyGlobalCSSTemplateEngine
+} from './core/CSSTemplateEngine'
+export type {
+  CSSTemplateConfig,
+  CSSTemplate
+} from './core/CSSTemplateEngine'
+
 // Device Detection exports
 export {
   DEFAULT_BREAKPOINTS,
@@ -365,6 +376,23 @@ export {
   CacheType,
   globalCacheManager
 } from './utils/CacheManager'
+
+// 优化工具导出
+export {
+  LRUCache as LRUCacheOptimized
+} from './utils/LRUCache'
+
+export {
+  MemoryMonitor,
+  getGlobalMemoryMonitor,
+  destroyGlobalMemoryMonitor
+} from './utils/MemoryMonitor'
+
+export type {
+  MemoryInfo,
+  MemoryMonitorOptions,
+  CleanupHandler
+} from './utils/MemoryMonitor'
 
 // Error handling exports
 export {

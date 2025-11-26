@@ -216,6 +216,62 @@ export class BaseSizeAdapter {
   }
 
   /**
+   * 设置基础尺寸
+   *
+   * @param size - 基础尺寸（像素）
+   */
+  setBaseSize(size: number): void {
+    this.state.baseSize = size
+    this.manager.setConfig({ baseSize: size } as SizeConfig)
+
+    if (this.persistenceConfig.enabled) {
+      this.saveToStorage()
+    }
+  }
+
+  /**
+   * 获取基础尺寸
+   *
+   * @returns 基础尺寸
+   */
+  getBaseSize(): number {
+    return this.state.baseSize
+  }
+
+  /**
+   * 设置缩放比例
+   *
+   * @param scale - 缩放比例
+   */
+  setScale(scale: number): void {
+    this.state.scale = scale
+    this.manager.setConfig({ scale } as SizeConfig)
+
+    if (this.persistenceConfig.enabled) {
+      this.saveToStorage()
+    }
+  }
+
+  /**
+   * 获取缩放比例
+   *
+   * @returns 缩放比例
+   */
+  getScale(): number {
+    return this.state.scale
+  }
+
+  /**
+   * 计算尺寸值
+   *
+   * @param level - 尺寸等级
+   * @returns 计算后的尺寸值
+   */
+  compute(level: number): number {
+    return this.manager.compute(level)
+  }
+
+  /**
    * 保存到存储
    */
   saveToStorage(): void {

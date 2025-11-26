@@ -29,10 +29,25 @@
       "import": "./esm/index.js",
       "require": "./cjs/index.cjs"
     },
+    "./composables": {
+      "types": "./esm/composables/index.d.ts",
+      "import": "./esm/composables/index.js",
+      "require": "./cjs/composables/index.cjs"
+    },
     "./composables/*": {
       "types": "./esm/composables/*.d.ts",
       "import": "./esm/composables/*.js",
       "require": "./cjs/composables/*.cjs"
+    },
+    "./directives": {
+      "types": "./esm/directives/index.d.ts",
+      "import": "./esm/directives/index.js",
+      "require": "./cjs/directives/index.cjs"
+    },
+    "./directives/*": {
+      "types": "./esm/directives/*.d.ts",
+      "import": "./esm/directives/*.js",
+      "require": "./cjs/directives/*.cjs"
     },
     "./plugin": {
       "types": "./esm/plugin/index.d.ts",
@@ -74,11 +89,13 @@
       "import": "./esm/size-switcher/*.js",
       "require": "./cjs/size-switcher/*.cjs"
     },
+    "./cjs/components/SizeDebugPanel.vue.css": "./cjs/components/SizeDebugPanel.vue.css",
     "./cjs/components/SizePresetPicker.vue.css": "./cjs/components/SizePresetPicker.vue.css",
+    "./cjs/components/SizeProvider.vue.css": "./cjs/components/SizeProvider.vue.css",
     "./cjs/components/SizeSwitcher.vue.css": "./cjs/components/SizeSwitcher.vue.css",
     "./cjs/index.css": "./cjs/index.css",
     "./cjs/size-preset-picker/index.css": "./cjs/size-preset-picker/index.css",
-    "./cjs/size-switcher/size-switcher.css": "./cjs/size-switcher/size-switcher.css",
+    "./cjs/size-switcher/index.css": "./cjs/size-switcher/index.css",
     "./dist/index.css": "./dist/index.css",
     "./dist/index.min.css": "./dist/index.min.css"
   },

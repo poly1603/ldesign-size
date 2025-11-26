@@ -1,12 +1,13 @@
 /**
  * @ldesign/size - Plugin System
- * 
+ *
  * Size system plugin for Vue 3 applications
  */
 
 import type { App, ComputedRef, Ref } from 'vue'
 import { getCurrentInstance, inject, ref } from 'vue'
 import { SizeManager, type SizePreset, getLocale, type SizeLocale } from '@ldesign/size-core'
+import { vSize } from '../directives'
 
 /**
  * Size plugin configuration options
@@ -260,7 +261,11 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
     defaultLocale: options.defaultLocale || 'zh-CN',
     autoDetect: options.autoDetect || false,
     cssVariables: options.cssVariables !== false,
-    locale: options.locale || currentLocale.value
+    locale: options.locale || currentLocale.value,
+    globalProperties: options.globalProperties !== false,
+    globalComponents: options.globalComponents !== false,
+    baseSize: options.baseSize || 16,
+    customPresets: options.customPresets || []
   }
   // Create size manager - 传入 storageKey 确保与插件使用相同的 key
   const manager = new SizeManager({
@@ -497,6 +502,10 @@ export function createSizePlugin(options: SizePluginOptions = {}): SizePlugin {
         // TODO: Register global components here
         console.log('[createSizePlugin] Global components registration skipped (not implemented yet)')
       }
+
+      // Register v-size directive globally
+      app.directive('size', vSize)
+      console.log('[createSizePlugin] v-size directive registered')
 
       // 注意：不再需要 loadSize()，因为 SizeManager 构造函数已经调用了 loadFromStorage()
       // 如果在这里再次加载会导致冲突，因为插件的 storage 和 Manager 的 storage 格式不同
