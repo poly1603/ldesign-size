@@ -1,6 +1,7 @@
 /**
  * 尺寸切换器样式
- * 卡片网格布局样式
+ * 使用 @ldesign/color 和 @ldesign/size 的 CSS 变量
+ * 现代化设计，支持亮暗主题
  */
 .ld-size-switcher {
   position: relative;
@@ -11,33 +12,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--size-10, 40px);
-  height: var(--size-10, 40px);
+  width: var(--size-9, 36px);
+  height: var(--size-9, 36px);
   padding: 0;
-  border: 1px solid var(--color-border, #d9d9d9);
-  border-radius: var(--size-2, 8px);
+  border: 1px solid var(--color-gray-200, #e5e7eb);
+  border-radius: var(--size-radius-md, 8px);
   background: var(--color-bg-container, #ffffff);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--color-text-secondary, #666);
+  transition: all var(--size-duration-fast, 150ms) cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--color-gray-500, #6b7280);
 }
 .size-button:hover {
-  border-color: var(--color-primary-default, #1890ff);
-  background: var(--color-bg-component-hover, #f5f5f5);
-  color: var(--color-primary-default, #1890ff);
+  border-color: var(--color-primary-400, #60a5fa);
+  background: var(--color-primary-50, #eff6ff);
+  color: var(--color-primary-500, #3b82f6);
 }
 /* 下拉面板 */
 .size-dropdown {
   position: absolute;
-  top: calc(100% + var(--size-2, 8px));
+  top: calc(100% + var(--size-space-xs, 8px));
   right: 0;
-  width: 400px;
+  width: 360px;
   max-width: 90vw;
   background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--color-border, #d9d9d9);
-  border-radius: var(--size-3, 12px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 1000;
+  border: 1px solid var(--color-gray-200, #e5e7eb);
+  border-radius: var(--size-radius-md, 8px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  z-index: var(--size-z-dropdown, 1050);
   overflow: hidden;
 }
 /* 下拉头部 */
@@ -45,69 +46,78 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--size-4, 16px) var(--size-5, 20px);
-  border-bottom: 1px solid var(--color-border, #e8e8e8);
-  background: var(--color-bg-container, #ffffff);
+  padding: var(--size-space-m, 14px) var(--size-space-l, 18px);
+  border-bottom: 1px solid var(--color-gray-100, #f3f4f6);
+  background: var(--color-gray-50, #f9fafb);
 }
 .dropdown-title {
-  font-size: var(--size-font-md, 16px);
+  font-size: var(--size-font-sm, 14px);
   font-weight: 600;
-  color: var(--color-text-primary, #333);
+  color: var(--color-gray-900, #111827);
+  letter-spacing: -0.01em;
 }
 /* 下拉内容 */
 .dropdown-content {
-  padding: var(--size-4, 16px);
-  max-height: 400px;
+  padding: var(--size-space-s, 12px);
+  max-height: 360px;
   overflow-y: auto;
 }
-/* 尺寸网格 */
+/* 尺寸网格 - 2列布局 */
 .size-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--size-2, 8px);
+  gap: var(--size-space-xs, 8px);
 }
 /* 尺寸卡片 */
 .size-card {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--size-5, 20px) var(--size-4, 16px);
-  border: 1px solid var(--color-border, #e8e8e8);
-  border-radius: var(--size-2, 8px);
-  background: var(--color-bg-container, #ffffff);
+  gap: var(--size-space-s, 12px);
+  padding: var(--size-space-s, 12px);
+  border: 1px solid var(--color-gray-100, #f3f4f6);
+  border-radius: var(--size-radius-sm, 6px);
+  background: var(--color-gray-50, #f9fafb);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-height: 72px;
+  transition: all var(--size-duration-fast, 150ms) cubic-bezier(0.4, 0, 0.2, 1);
 }
 .size-card:hover {
-  border-color: var(--color-primary-default, #1890ff);
-  background: var(--color-bg-component-hover, #f5f5f5);
+  border-color: var(--color-gray-200, #e5e7eb);
+  background: var(--color-bg-container, #ffffff);
 }
 .size-card.active {
-  border-color: var(--color-primary-default, #1890ff);
-  background: var(--color-primary-lighter, #e6f7ff);
+  border-color: var(--color-primary-200, #bfdbfe);
+  background: var(--color-primary-50, #eff6ff);
 }
 /* 卡片信息 */
 .card-info {
+  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--size-1, 4px);
+  justify-content: space-between;
+  gap: var(--size-space-xs, 8px);
 }
 /* 卡片名称 */
 .card-name {
-  font-size: var(--size-font-base, 14px);
-  font-weight: 600;
-  color: var(--color-text-primary, #333);
+  font-size: var(--size-font-sm, 14px);
+  font-weight: 500;
+  color: var(--color-gray-700, #374151);
 }
 .size-card.active .card-name {
-  color: var(--color-primary-default, #1890ff);
+  color: var(--color-primary-600, #2563eb);
+  font-weight: 600;
 }
 /* 卡片尺寸 */
 .card-size {
   font-size: var(--size-font-xs, 12px);
-  color: var(--color-text-secondary, #666);
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  color: var(--color-gray-400, #9ca3af);
+  font-family: var(--size-font-family-mono, 'SF Mono', 'Monaco', 'Consolas', monospace);
+  background: var(--color-gray-100, #f3f4f6);
+  padding: var(--size-space-xxs, 2px) var(--size-space-xs, 6px);
+  border-radius: var(--size-radius-sm, 4px);
+}
+.size-card.active .card-size {
+  background: var(--color-primary-100, #dbeafe);
+  color: var(--color-primary-600, #2563eb);
 }
 /* Vue Transition 动画 - 打开和关闭 */
 .dropdown-enter-active {
@@ -125,41 +135,75 @@
   transform: translateY(-8px) scale(0.95);
 }
 /* 暗色主题适配 */
-@media (prefers-color-scheme: dark) {
-  .size-button {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-    color: var(--color-text-primary, #e8e8e8);
-  }
-  .size-button:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-  }
-  .size-dropdown {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  }
-  .dropdown-header {
-    border-bottom-color: var(--color-border, #434343);
-  }
-  .dropdown-title {
-    color: var(--color-text-primary, #e8e8e8);
-  }
-  .refresh-btn:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-  }
-  .size-card {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-  }
-  .size-card:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-  }
-  .size-card.active {
-    background: var(--color-primary-bg, #111d2c);
-  }
-  .card-icon,
-  .card-name {
-    color: var(--color-text-primary, #e8e8e8);
-  }
+[data-theme-mode="dark"] .size-button,
+[data-theme="dark"] .size-button,
+.dark .size-button {
+  background: var(--color-gray-800, #1f2937);
+  border-color: var(--color-gray-700, #374151);
+  color: var(--color-gray-300, #d1d5db);
+}
+[data-theme-mode="dark"] .size-button:hover,
+[data-theme="dark"] .size-button:hover,
+.dark .size-button:hover {
+  background: var(--color-gray-700, #374151);
+  border-color: var(--color-primary-500, #3b82f6);
+  color: var(--color-primary-400, #60a5fa);
+}
+[data-theme-mode="dark"] .size-dropdown,
+[data-theme="dark"] .size-dropdown,
+.dark .size-dropdown {
+  background: var(--color-gray-800, #1f2937);
+  border-color: var(--color-gray-700, #374151);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+[data-theme-mode="dark"] .dropdown-header,
+[data-theme="dark"] .dropdown-header,
+.dark .dropdown-header {
+  background: var(--color-gray-900, #111827);
+  border-bottom-color: var(--color-gray-700, #374151);
+}
+[data-theme-mode="dark"] .dropdown-title,
+[data-theme="dark"] .dropdown-title,
+.dark .dropdown-title {
+  color: var(--color-gray-100, #f3f4f6);
+}
+[data-theme-mode="dark"] .size-card,
+[data-theme="dark"] .size-card,
+.dark .size-card {
+  background: var(--color-gray-800, #1f2937);
+  border-color: var(--color-gray-700, #374151);
+}
+[data-theme-mode="dark"] .size-card:hover,
+[data-theme="dark"] .size-card:hover,
+.dark .size-card:hover {
+  background: var(--color-gray-700, #374151);
+  border-color: var(--color-primary-500, #3b82f6);
+}
+[data-theme-mode="dark"] .size-card.active,
+[data-theme="dark"] .size-card.active,
+.dark .size-card.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--color-primary-500, #3b82f6);
+}
+[data-theme-mode="dark"] .card-name,
+[data-theme="dark"] .card-name,
+.dark .card-name {
+  color: var(--color-gray-200, #e5e7eb);
+}
+[data-theme-mode="dark"] .size-card.active .card-name,
+[data-theme="dark"] .size-card.active .card-name,
+.dark .size-card.active .card-name {
+  color: var(--color-primary-400, #60a5fa);
+}
+[data-theme-mode="dark"] .card-size,
+[data-theme="dark"] .card-size,
+.dark .card-size {
+  background: var(--color-gray-700, #374151);
+  color: var(--color-gray-400, #9ca3af);
+}
+[data-theme-mode="dark"] .size-card.active .card-size,
+[data-theme="dark"] .size-card.active .card-size,
+.dark .size-card.active .card-size {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--color-primary-400, #60a5fa);
 }
