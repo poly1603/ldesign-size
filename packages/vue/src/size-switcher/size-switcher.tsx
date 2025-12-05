@@ -8,8 +8,9 @@
  * <SizeSwitcher translate={t} locale={locale} />
  * ```
  */
-import { computed, defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref, Transition } from 'vue'
 import type { PropType } from 'vue'
+import { Type } from 'lucide-vue-next'
 import type { SizePresetTheme } from '@ldesign/size-core'
 import './style/index.less'
 
@@ -128,7 +129,8 @@ export default defineComponent({
     /**
      * 切换下拉菜单
      */
-    const toggleDropdown = () => {
+    const toggleDropdown = (e: MouseEvent) => {
+      e.stopPropagation() // 阻止事件冒泡
       isOpen.value = !isOpen.value
     }
 
@@ -150,10 +152,12 @@ export default defineComponent({
       }
     }
 
-    // 挂载时添加事件监听
+    // 挂载时添加事件监听(延迟添加,避免与按钮点击冲突)
     onMounted(() => {
       if (typeof window !== 'undefined') {
-        window.addEventListener('click', handleClickOutside)
+        setTimeout(() => {
+          window.addEventListener('click', handleClickOutside)
+        }, 0)
       }
     })
 
@@ -167,25 +171,34 @@ export default defineComponent({
     return () => (
       <div class="ld-size-switcher">
         <button class="size-button" title={sizeTitle.value} onClick={toggleDropdown}>
-          <span class="size-icon">📏</span>
-          <span class="size-text">{sizeText.value}</span>
-          <span class="dropdown-icon">{isOpen.value ? '▲' : '▼'}</span>
+          <Type size={18} strokeWidth={2} />
         </button>
 
-        {isOpen.value && (
-          <div class="size-dropdown">
-            {presets.value.map(preset => (
-              <div
-                key={preset.name}
-                class={['size-option', { active: currentPreset.value?.name === preset.name }]}
-                onClick={() => selectPreset(preset.name)}
-              >
-                <span class="preset-name">{getPresetLabel(preset)}</span>
-                <span class="preset-size">{preset.baseSize}px</span>
+        <Transition name="dropdown">
+          {isOpen.value && (
+            <div class="size-dropdown" onClick={(e: MouseEvent) => e.stopPropagation()}>
+              <div class="dropdown-header">
+                <span class="dropdown-title">全局尺寸</span>
               </div>
-            ))}
-          </div>
-        )}
+              <div class="dropdown-content">
+                <div class="size-grid">
+                  {presets.value.map(preset => (
+                    <div
+                      key={preset.name}
+                      class={['size-card', { active: currentPreset.value?.name === preset.name }]}
+                      onClick={() => selectPreset(preset.name)}
+                    >
+                      <div class="card-info">
+                        <span class="card-name">{getPresetLabel(preset)}</span>
+                        <span class="card-size">{preset.baseSize}px</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </Transition>
       </div>
     )
   }

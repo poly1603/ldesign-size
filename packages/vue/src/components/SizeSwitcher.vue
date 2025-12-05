@@ -1,17 +1,26 @@
 <template>
   <div class="ld-size-switcher">
     <button class="size-button" :title="sizeTitle" @click="toggleDropdown">
-      <span class="size-icon">📏</span>
-      <span class="size-text">{{ sizeText }}</span>
-      <span class="dropdown-icon">{{ isOpen ? '▲' : '▼' }}</span>
+      <span class="size-icon">A</span>
     </button>
 
-    <!-- 下拉菜单 -->
-    <div v-if="isOpen" class="size-dropdown">
-      <div v-for="preset in presets" :key="preset.name" class="size-option"
-        :class="{ active: currentPreset?.name === preset.name }" @click="selectPreset(preset.name)">
-        <span class="preset-name">{{ getPresetLabel(preset) }}</span>
-        <span class="preset-size">{{ preset.baseSize }}px</span>
+    <!-- 下拉菜单 - 卡片网格布局 -->
+    <div v-if="isOpen" class="size-dropdown" @click.stop>
+      <div class="dropdown-header">
+        <span class="dropdown-title">{{ translate?.('size.title') || '全局尺寸' }}</span>
+        <button class="close-btn" @click="isOpen = false">×</button>
+      </div>
+      <div class="dropdown-content">
+        <div class="size-grid">
+          <div v-for="preset in presets" :key="preset.name" class="size-card"
+            :class="{ active: currentPreset?.name === preset.name }" @click="selectPreset(preset.name)">
+            <span class="card-icon">A</span>
+            <div class="card-info">
+              <span class="card-name">{{ getPresetLabel(preset) }}</span>
+              <span class="card-size">{{ preset.baseSize }}px</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -117,7 +126,8 @@ function getPresetLabel(preset: SizePresetTheme): string {
 }
 
 // 切换下拉菜单
-function toggleDropdown() {
+function toggleDropdown(e: MouseEvent) {
+  e.stopPropagation() // 阻止事件冒泡
   isOpen.value = !isOpen.value
 }
 
@@ -144,76 +154,224 @@ if (typeof window !== 'undefined') {
   display: inline-block;
 }
 
+/* 尺寸按钮 - 仅显示图标 */
 .size-button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--ld-bg-color, #ffffff);
-  border: 1px solid var(--ld-border-color, #e0e0e0);
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border, #d9d9d9);
   border-radius: 6px;
+  background: var(--color-bg-container, #ffffff);
   cursor: pointer;
-  font-size: 14px;
-  color: var(--ld-text-color, #333333);
-  transition: all 0.2s ease;
+  transition: all 0.2s;
+  color: var(--color-text-primary, #333);
 }
 
 .size-button:hover {
-  background: var(--ld-bg-hover-color, #f5f5f5);
-  border-color: var(--ld-primary-color, #1890ff);
+  border-color: var(--color-primary-hover, #40a9ff);
+  background: var(--color-bg-component-hover, #f5f5f5);
 }
 
+/* 尺寸图标 */
 .size-icon {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.size-text {
-  font-weight: 500;
-}
-
-.dropdown-icon {
-  font-size: 10px;
-  opacity: 0.6;
-}
-
+/* 下拉面板 */
 .size-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 8px);
   right: 0;
-  min-width: 200px;
-  background: var(--ld-bg-color, #ffffff);
-  border: 1px solid var(--ld-border-color, #e0e0e0);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 520px;
+  max-width: 90vw;
+  background: var(--color-bg-container, #ffffff);
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 1000;
   overflow: hidden;
+  animation: dropdown-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.size-option {
+/* 下拉头部 */
+.dropdown-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border, #e8e8e8);
+}
+
+.dropdown-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  transition: background 0.2s ease;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 20px;
+  color: var(--color-text-secondary, #666);
 }
 
-.size-option:hover {
-  background: var(--ld-bg-hover-color, #f5f5f5);
+.close-btn:hover {
+  background: var(--color-bg-component-hover, #f5f5f5);
+  color: var(--color-text-primary, #333);
 }
 
-.size-option.active {
-  background: var(--ld-primary-color-light, #e6f7ff);
-  color: var(--ld-primary-color, #1890ff);
+/* 下拉内容 */
+.dropdown-content {
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
-.preset-name {
+/* 尺寸网格 */
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+/* 尺寸卡片 */
+.size-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid var(--color-border, #e8e8e8);
+  border-radius: 8px;
+  background: var(--color-bg-container, #ffffff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.size-card:hover {
+  border-color: var(--color-primary, #1890ff);
+  background: var(--color-bg-component-hover, #f5f5f5);
+}
+
+.size-card.active {
+  border-color: var(--color-primary, #1890ff);
+  background: var(--color-primary-bg, #e6f7ff);
+}
+
+/* 卡片图标 */
+.card-icon {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  color: var(--color-text-primary, #333);
+}
+
+.size-card.active .card-icon {
+  color: var(--color-primary, #1890ff);
+}
+
+/* 卡片信息 */
+.card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 卡片名称 */
+.card-name {
+  font-size: 15px;
   font-weight: 500;
+  color: var(--color-text-primary, #333);
 }
 
-.preset-size {
+.size-card.active .card-name {
+  color: var(--color-primary, #1890ff);
+}
+
+/* 卡片尺寸 */
+.card-size {
   font-size: 12px;
   opacity: 0.7;
   font-family: 'Courier New', monospace;
+}
+
+/* 下拉动画 */
+@keyframes dropdown-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .size-button {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--color-border, #434343);
+    color: var(--color-text-primary, #e8e8e8);
+  }
+
+  .size-button:hover {
+    background: var(--color-bg-component-hover, #2a2a2a);
+  }
+
+  .size-dropdown {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--color-border, #434343);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .dropdown-header {
+    border-bottom-color: var(--color-border, #434343);
+  }
+
+  .dropdown-title {
+    color: var(--color-text-primary, #e8e8e8);
+  }
+
+  .close-btn {
+    color: var(--color-text-secondary, #999);
+  }
+
+  .close-btn:hover {
+    background: var(--color-bg-component-hover, #2a2a2a);
+    color: var(--color-text-primary, #e8e8e8);
+  }
+
+  .size-card {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--color-border, #434343);
+  }
+
+  .size-card:hover {
+    background: var(--color-bg-component-hover, #2a2a2a);
+  }
+
+  .size-card.active {
+    background: var(--color-primary-bg, #111d2c);
+  }
+
+  .card-icon,
+  .card-name {
+    color: var(--color-text-primary, #e8e8e8);
+  }
 }
 </style>
