@@ -28,76 +28,88 @@
     ".": {
       "types": "./es/index.d.ts",
       "import": "./es/index.js",
-      "require": "./lib/index.cjs"
+      "require": "./lib/index.cjs",
+      "default": "./es/index.js"
     },
     "./adapter/*": {
       "types": "./es/adapter/*.d.ts",
       "import": "./es/adapter/*.js",
-      "require": "./lib/adapter/*.cjs"
+      "require": "./lib/adapter/*.cjs",
+      "default": "./es/adapter/*.js"
     },
     "./constants/*": {
       "types": "./es/constants/*.d.ts",
       "import": "./es/constants/*.js",
-      "require": "./lib/constants/*.cjs"
+      "require": "./lib/constants/*.cjs",
+      "default": "./es/constants/*.js"
     },
     "./core/*": {
       "types": "./es/core/*.d.ts",
       "import": "./es/core/*.js",
-      "require": "./lib/core/*.cjs"
+      "require": "./lib/core/*.cjs",
+      "default": "./es/core/*.js"
     },
     "./locales": {
       "types": "./es/locales/index.d.ts",
       "import": "./es/locales/index.js",
-      "require": "./lib/locales/index.cjs"
+      "require": "./lib/locales/index.cjs",
+      "default": "./es/locales/index.js"
     },
     "./locales/*": {
       "types": "./es/locales/*.d.ts",
       "import": "./es/locales/*.js",
-      "require": "./lib/locales/*.cjs"
+      "require": "./lib/locales/*.cjs",
+      "default": "./es/locales/*.js"
     },
     "./modules/*": {
       "types": "./es/modules/*.d.ts",
       "import": "./es/modules/*.js",
-      "require": "./lib/modules/*.cjs"
+      "require": "./lib/modules/*.cjs",
+      "default": "./es/modules/*.js"
     },
     "./optimizations": {
       "types": "./es/optimizations/index.d.ts",
       "import": "./es/optimizations/index.js",
-      "require": "./lib/optimizations/index.cjs"
+      "require": "./lib/optimizations/index.cjs",
+      "default": "./es/optimizations/index.js"
     },
     "./optimizations/*": {
       "types": "./es/optimizations/*.d.ts",
       "import": "./es/optimizations/*.js",
-      "require": "./lib/optimizations/*.cjs"
+      "require": "./lib/optimizations/*.cjs",
+      "default": "./es/optimizations/*.js"
     },
     "./presets/*": {
       "types": "./es/presets/*.d.ts",
       "import": "./es/presets/*.js",
-      "require": "./lib/presets/*.cjs"
+      "require": "./lib/presets/*.cjs",
+      "default": "./es/presets/*.js"
     },
     "./utils": {
       "types": "./es/utils/index.d.ts",
       "import": "./es/utils/index.js",
-      "require": "./lib/utils/index.cjs"
+      "require": "./lib/utils/index.cjs",
+      "default": "./es/utils/index.js"
     },
     "./utils/*": {
       "types": "./es/utils/*.d.ts",
       "import": "./es/utils/*.js",
-      "require": "./lib/utils/*.cjs"
-    }
+      "require": "./lib/utils/*.cjs",
+      "default": "./es/utils/*.js"
+    },
+    "./package.json": "./package.json"
   },
   "main": "./lib/index.cjs",
   "module": "./es/index.js",
   "types": "./es/index.d.ts",
-  "unpkg": "./dist/index.min.js",
-  "jsdelivr": "./dist/index.min.js",
+  "unpkg": "./dist/index.js",
+  "jsdelivr": "./dist/index.js",
   "files": [
     "README.md",
     "LICENSE",
-    "package.json",
+    "CHANGELOG.md",
     "es",
-    "lib",
-    "dist"
+    "lib"
   ],
   "scripts": {
     "build": "ldesign-builder build",
@@ -121,5 +133,7 @@
     "typescript": "^5.7.3",
     "vite": "^5.0.12",
     "vitest": "^2.0.0"
-  }
+  },
+  "typings": "./es/index.d.ts",
+  "browser": "./dist/index.js"
 }

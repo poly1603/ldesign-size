@@ -7,7 +7,6 @@ import { defineConfig } from '@ldesign/builder'
 
 export default defineConfig({
   name: 'LDesignSizeCore',
-  libraryType: 'typescript',
 
   input: 'src/index.ts',
 

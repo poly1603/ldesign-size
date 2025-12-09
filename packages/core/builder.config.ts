@@ -1,5 +1,5 @@
 /**
- * @ldesign/size-vue 构建配置
+ * @ldesign/size-core 构建配置
  */
 import { defineConfig } from '@ldesign/builder'
 
@@ -9,10 +9,9 @@ export default defineConfig({
     { format: 'esm', dir: 'es', preserveModules: true, preserveModulesRoot: 'src' },
     { format: 'esm', dir: 'esm', preserveModules: true, preserveModulesRoot: 'src' },
     { format: 'cjs', dir: 'lib', preserveModules: true, preserveModulesRoot: 'src' },
-    { format: 'umd', dir: 'dist', name: 'LDesignSizeVue' },
+    { format: 'umd', dir: 'dist', name: 'LDesignSizeCore' },
   ],
-  external: ['vue', '@ldesign/size-core', 'lucide-vue-next'],
+  external: [],
   dts: true,
   clean: true,
 })
-
