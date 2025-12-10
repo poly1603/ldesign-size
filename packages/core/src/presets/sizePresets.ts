@@ -46,8 +46,8 @@ export interface SizePresetTheme {
 export const sizePresetThemes: SizePresetTheme[] = [
   {
     name: 'compact',
-    label: 'Compact',
-    description: 'Compact size system for information-dense interfaces',
+    label: '紧凑',
+    description: '紧凑尺寸系统，适用于信息密集型界面',
     order: 1,
     config: {
       baseSize: 14,
@@ -59,8 +59,8 @@ export const sizePresetThemes: SizePresetTheme[] = [
   },
   {
     name: 'default',
-    label: 'Default',
-    description: 'Default size system balancing aesthetics and practicality',
+    label: '默认',
+    description: '默认尺寸系统，平衡美观与实用',
     order: 2,
     config: {
       baseSize: 16,
@@ -72,8 +72,8 @@ export const sizePresetThemes: SizePresetTheme[] = [
   },
   {
     name: 'comfortable',
-    label: 'Comfortable',
-    description: 'Comfortable size system for extended reading',
+    label: '舒适',
+    description: '舒适尺寸系统，适合长时间阅读',
     order: 3,
     config: {
       baseSize: 18,
@@ -85,8 +85,8 @@ export const sizePresetThemes: SizePresetTheme[] = [
   },
   {
     name: 'large',
-    label: 'Large',
-    description: 'Large size system for elderly and visually impaired',
+    label: '大号',
+    description: '大尺寸系统，适合老年人和视力障碍者',
     order: 4,
     config: {
       baseSize: 20,

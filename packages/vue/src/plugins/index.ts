@@ -5,5 +5,9 @@
  */
 
 export { createSizeEnginePlugin, useSizeFromEngine } from './engine-plugin'
-export type { SizeEnginePluginOptions } from './engine-plugin'
+export type {
+  SizeEnginePluginOptions,
+  SizePluginContext,
+  SizeSwitcherConfig,
+} from './engine-plugin'
 

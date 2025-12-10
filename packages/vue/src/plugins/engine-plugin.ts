@@ -15,6 +15,47 @@ import { createSizePlugin } from '../plugin/index'
 import { SIZE_SYMBOL } from '../constants'
 
 /**
+ * 尺寸选择器配置
+ */
+export interface SizeSwitcherConfig {
+  /** 禁用的预设名称 */
+  disabledPresets?: string[]
+  /** 自定义预设 */
+  customPresets?: SizePresetTheme[]
+  /** 是否只使用自定义预设 */
+  useOnlyCustom?: boolean
+  /** 样式配置 */
+  style?: {
+    width?: string
+    maxHeight?: string
+  }
+}
+
+/**
+ * Size 插件上下文（用于 onReady 回调）
+ */
+export interface SizePluginContext {
+  /** 应用预设 */
+  applyPreset: (preset: string) => void
+  /** 获取当前预设 */
+  getCurrentPreset: () => SizePresetTheme | null
+  /** 设置基础尺寸 */
+  setBaseSize: (size: number) => void
+  /** 获取基础尺寸 */
+  getBaseSize: () => number
+  /** 设置缩放比例 */
+  setScale: (scale: number) => void
+  /** 获取缩放比例 */
+  getScale: () => number
+  /** 获取所有预设 */
+  getPresets: () => SizePresetTheme[]
+  /** 计算尺寸 */
+  compute: (level: number) => number
+  /** 适配器实例 */
+  adapter: BaseSizeAdapter
+}
+
+/**
  * Size Engine 插件选项
  * 
  * 扩展 SizeAdapterOptions，添加 Engine 特定的配置
@@ -56,6 +97,16 @@ export interface SizeEnginePluginOptions extends Omit<SizeAdapterOptions, 'baseS
     /** 存储类型 */
     storage?: 'localStorage' | 'sessionStorage'
   }
+
+  // ========== 尺寸选择器配置 ==========
+  /** 尺寸选择器配置 */
+  sizeSwitcher?: SizeSwitcherConfig
+
+  // ========== 事件回调 ==========
+  /** 尺寸变化回调 */
+  onSizeChange?: (preset: SizePresetTheme, oldPreset: SizePresetTheme | null) => void | Promise<void>
+  /** 初始化完成回调 */
+  onReady?: (context: SizePluginContext) => void | Promise<void>
 }
 
 /**
@@ -102,6 +153,9 @@ export function createSizeEnginePlugin(
     baseSize,
     customPresets,
     persistence,
+    sizeSwitcher,
+    onSizeChange,
+    onReady,
     ...adapterOptions
   } = options
 
@@ -109,20 +163,58 @@ export function createSizeEnginePlugin(
     console.log('[Size Engine Plugin] Creating plugin with options:', options)
   }
 
+  // ==================== 持久化配置 ====================
+  const STORAGE_KEY = persistence?.key || 'ldesign-size'
+  const storageType = persistence?.storage || 'localStorage'
+  const persistenceEnabled = persistence?.enabled !== false
+
+  // 从 Storage 读取保存的预设（兼容 BaseSizeAdapter 格式）
+  const loadPresetFromStorage = (): string | null => {
+    if (!persistenceEnabled) return null
+    try {
+      const storage = storageType === 'sessionStorage' ? sessionStorage : localStorage
+      const data = storage.getItem(STORAGE_KEY)
+      if (data) {
+        const parsed = JSON.parse(data)
+        // 兼容两种格式：{ preset: ... } 和 { presetName: ... }
+        return parsed.preset || parsed.presetName || null
+      }
+    } catch { /* ignore */ }
+    return null
+  }
+
+  // 保存预设到 Storage（使用 BaseSizeAdapter 兼容格式）
+  const savePresetToStorage = (preset: string) => {
+    if (!persistenceEnabled) return
+    try {
+      const storage = storageType === 'sessionStorage' ? sessionStorage : localStorage
+      // 使用与 BaseSizeAdapter 兼容的格式
+      const data = {
+        presetName: preset,
+        updatedAt: Date.now()
+      }
+      storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    } catch (e) {
+      console.warn('[Size Engine Plugin] Failed to save preset to storage:', e)
+    }
+  }
+
   // 处理 baseSize：如果是预设名称，需要在适配器中处理
   let presetName: string | undefined
   let resolvedBaseSize: number | undefined
 
-  if (typeof baseSize === 'string') {
-    // 是预设名称
+  // 优先从 Storage 恢复
+  const storedPreset = loadPresetFromStorage()
+  if (storedPreset) {
+    presetName = storedPreset
+  } else if (typeof baseSize === 'string') {
     presetName = baseSize
-    if (debug) {
-      console.log(`[Size Engine Plugin] Using preset: ${presetName}`)
-    }
-  }
-  else if (typeof baseSize === 'number') {
-    // 是具体数值
+  } else if (typeof baseSize === 'number') {
     resolvedBaseSize = baseSize
+  }
+
+  if (debug) {
+    console.log('[Size Engine Plugin] Initial preset:', { presetName, storedPreset, baseSize })
   }
 
   // 创建适配器
@@ -131,7 +223,7 @@ export function createSizeEnginePlugin(
     baseSize: resolvedBaseSize,
     customPresets,
     persistence,
-    immediate: false, // 延迟初始化，等插件安装后再初始化
+    immediate: false,
     presetName,
   })
 
@@ -147,6 +239,7 @@ export function createSizeEnginePlugin(
 
   // 标记 Vue 插件是否已安装
   let vueInstalled = false
+  let pluginContext: SizePluginContext | null = null
 
   // 返回 Engine 插件
   return {
@@ -161,11 +254,44 @@ export function createSizeEnginePlugin(
         console.log(`[Size Engine Plugin] Installing plugin: ${name}`)
       }
 
-      // 兼容 Engine Core 的插件上下文：既支持传入 context，也支持直接传入 engine
+      // 兼容 Engine Core 的插件上下文
       const engine: any = (context?.engine || context)
 
       // 1. 初始化适配器
       sizeAdapter.initialize(presetName)
+
+      // 包装 applyPreset 以触发回调和持久化
+      const originalApplyPreset = sizeAdapter.applyPreset.bind(sizeAdapter)
+      sizeAdapter.applyPreset = (newPreset: string) => {
+        const oldPreset = sizeAdapter.getCurrentPreset()
+        originalApplyPreset(newPreset)
+        const currentPreset = sizeAdapter.getCurrentPreset()
+
+        // 保存到 Storage
+        savePresetToStorage(newPreset)
+
+        // 触发回调
+        if (onSizeChange && currentPreset) {
+          try {
+            onSizeChange(currentPreset, oldPreset)
+          } catch (e) {
+            console.error('[Size Engine Plugin] onSizeChange error:', e)
+          }
+        }
+      }
+
+      // 创建插件上下文
+      pluginContext = {
+        applyPreset: (preset: string) => sizeAdapter.applyPreset(preset),
+        getCurrentPreset: () => sizeAdapter.getCurrentPreset(),
+        setBaseSize: (size: number) => sizeAdapter.setBaseSize(size),
+        getBaseSize: () => sizeAdapter.getBaseSize(),
+        setScale: (scale: number) => sizeAdapter.setScale(scale),
+        getScale: () => sizeAdapter.getScale(),
+        getPresets: () => sizeAdapter.getPresets(),
+        compute: (level: number) => sizeAdapter.compute(level),
+        adapter: sizeAdapter,
+      }
 
       // 2. 注册到 Engine 状态
       if (engine?.state) {
@@ -209,6 +335,10 @@ export function createSizeEnginePlugin(
         try {
           app.use(vuePlugin)
           vueInstalled = true
+
+          // 重要：覆盖 $sizeManager 为 sizeAdapter，确保持久化生效
+          app.config.globalProperties.$sizeManager = sizeAdapter
+
           console.log('[Size Engine Plugin] Vue plugin installed')
         } catch (error) {
           console.error('[Size Engine Plugin] Error installing Vue plugin:', error)
@@ -232,12 +362,31 @@ export function createSizeEnginePlugin(
             // 然后安装 Vue 插件
             app.use(vuePlugin)
             vueInstalled = true
+
+            // 重要：覆盖 $sizeManager 为 sizeAdapter，确保持久化生效
+            app.config.globalProperties.$sizeManager = sizeAdapter
+
             console.log('[Size] size installed to Vue app')
           }
           else {
             console.error('[Size] Vue app not found after app:created event')
           }
         })
+      }
+
+      // 保存配置到状态
+      engine?.state?.set?.('size:config', options)
+
+      // 触发 onReady 回调
+      if (onReady && pluginContext) {
+        try {
+          await onReady(pluginContext)
+          if (debug) {
+            console.log('[Size Engine Plugin] onReady hook executed')
+          }
+        } catch (e) {
+          console.error('[Size Engine Plugin] onReady error:', e)
+        }
       }
 
       if (debug) {

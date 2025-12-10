@@ -1,37 +1,47 @@
 <template>
-  <div class="ld-size-switcher">
-    <button class="size-button" :title="sizeTitle" @click="toggleDropdown">
-      <span class="size-icon">A</span>
+  <div ref="containerRef" :class="containerClass">
+    <button type="button" :class="triggerClass" :disabled="disabled" :title="sizeTooltip" @click="isOpen = !isOpen">
+      <Type :size="18" :stroke-width="2" />
     </button>
 
-    <!-- 下拉菜单 - 卡片网格布局 -->
-    <div v-if="isOpen" class="size-dropdown" @click.stop>
-      <div class="dropdown-header">
-        <span class="dropdown-title">{{ translate?.('size.title') || '全局尺寸' }}</span>
-        <button class="close-btn" @click="isOpen = false">×</button>
-      </div>
-      <div class="dropdown-content">
-        <div class="size-grid">
-          <div v-for="preset in presets" :key="preset.name" class="size-card"
-            :class="{ active: currentPreset?.name === preset.name }" @click="selectPreset(preset.name)">
-            <span class="card-icon">A</span>
-            <div class="card-info">
-              <span class="card-name">{{ getPresetLabel(preset) }}</span>
-              <span class="card-size">{{ preset.baseSize }}px</span>
+    <Transition name="ldesign-dropdown">
+      <div v-if="isOpen" class="ldesign-size-switcher__dropdown">
+        <div class="ldesign-size-switcher__arrow" />
+        <div class="ldesign-size-switcher__header">
+          <h4 class="ldesign-size-switcher__title">{{ titleText }}</h4>
+        </div>
+        <div class="ldesign-size-switcher__list">
+          <div v-for="preset in presets" :key="preset.name" :class="[
+            'ldesign-size-switcher__item',
+            currentPreset?.name === preset.name && 'ldesign-size-switcher__item--active'
+          ]" @click="selectPreset(preset.name)">
+            <span class="ldesign-size-switcher__item-icon">
+              <span
+                :style="{ fontSize: `${Math.max(12, (preset.config?.baseSize || preset.baseSize || 16) - 2)}px` }">A</span>
+            </span>
+            <div class="ldesign-size-switcher__item-info">
+              <span class="ldesign-size-switcher__item-label">{{ getPresetLabel(preset) }}</span>
+              <span class="ldesign-size-switcher__item-desc">{{ getPresetDesc(preset) }}</span>
             </div>
+            <Check v-if="currentPreset?.name === preset.name" :size="16" :stroke-width="3"
+              class="ldesign-size-switcher__check" />
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, ref } from 'vue'
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
+import { Type, Check } from 'lucide-vue-next'
 import type { SizePresetTheme } from '@ldesign/size-core'
 
 // Props
 const props = defineProps<{
+  disabled?: boolean
+  size?: 'small' | 'medium' | 'large'
+  title?: string
   translate?: (key: string) => string
   locale?: string | { value: string }
 }>()
@@ -39,9 +49,13 @@ const props = defineProps<{
 // 获取当前组件实例，访问全局属性
 const instance = getCurrentInstance()
 const sizeManager = instance?.appContext.config.globalProperties.$sizeManager
+const containerRef = ref<HTMLElement | null>(null)
 
 // 下拉菜单状态
 const isOpen = ref(false)
+
+// 响应式当前预设名称
+const currentPresetName = ref<string | null>(sizeManager?.getCurrentPreset?.()?.name || null)
 
 // 获取所有预设
 const presets = computed<SizePresetTheme[]>(() => {
@@ -50,328 +64,374 @@ const presets = computed<SizePresetTheme[]>(() => {
 
 // 当前预设
 const currentPreset = computed(() => {
-  return sizeManager?.getCurrentPreset?.() || null
+  // 使用 currentPresetName 触发响应式更新
+  const name = currentPresetName.value
+  if (!name) return sizeManager?.getCurrentPreset?.() || null
+  return presets.value.find(p => p.name === name) || null
 })
 
-// 尺寸文本
-const sizeText = computed(() => {
-  if (!currentPreset.value) return 'Size'
-
-  // 关键修复：正确处理 Ref 类型的 locale prop
-  let currentLocale: string | undefined
-
-  // 检查是否有 value 属性（Ref 或类 Ref 对象）
+// 获取当前语言
+const getCurrentLocale = (): string | undefined => {
   if (props.locale && typeof props.locale === 'object' && 'value' in props.locale) {
-    currentLocale = (props.locale as { value: string }).value
+    return (props.locale as { value: string }).value
+  } else if (typeof props.locale === 'string') {
+    return props.locale
   }
-  else if (typeof props.locale === 'string') {
-    currentLocale = props.locale
-  }
+  return undefined
+}
 
-  // 使用翻译
-  if (currentLocale && props.translate) {
-    return props.translate(`size.presets.${currentPreset.value}`)
-  }
+// 判断是否中文
+const isZh = computed(() => {
+  const locale = getCurrentLocale() || ''
+  return locale.toLowerCase().startsWith('zh') || locale.includes('cn')
+})
 
-  if (props.translate) {
-    return props.translate(`size.presets.${currentPreset.value}`)
-  }
-
-  // 降级到预设名称
-  return currentPreset.value
+// 标题文本
+const titleText = computed(() => {
+  if (props.title) return props.title
+  if (props.translate) return props.translate('size.title')
+  return isZh.value ? '尺寸管理' : 'Size Management'
 })
 
 // 尺寸提示文本
-const sizeTitle = computed(() => {
-  let currentLocale: string | undefined
+const sizeTooltip = computed(() => {
+  if (props.translate) return props.translate('size.switchSize')
+  return isZh.value ? '切换尺寸' : 'Switch Size'
+})
 
-  if (props.locale && typeof props.locale === 'object' && 'value' in props.locale) {
-    currentLocale = (props.locale as { value: string }).value
-  }
-  else if (typeof props.locale === 'string') {
-    currentLocale = props.locale
-  }
+// 触发器样式类
+const triggerClass = computed(() => {
+  const classes = ['ldesign-size-switcher__trigger']
+  if (props.size === 'small') classes.push('ldesign-size-switcher__trigger--small')
+  if (props.size === 'large') classes.push('ldesign-size-switcher__trigger--large')
+  return classes.join(' ')
+})
 
-  if (currentLocale && props.translate) {
-    return props.translate('size.switchSize')
-  }
-
-  if (props.translate) {
-    return props.translate('size.switchSize')
-  }
-
-  return '切换尺寸'
+// 容器样式类
+const containerClass = computed(() => {
+  const classes = ['ldesign-size-switcher']
+  if (props.disabled) classes.push('ldesign-size-switcher--disabled')
+  return classes.join(' ')
 })
 
 // 获取预设标签
 function getPresetLabel(preset: SizePresetTheme): string {
-  let currentLocale: string | undefined
-
-  if (props.locale && typeof props.locale === 'object' && 'value' in props.locale) {
-    currentLocale = (props.locale as { value: string }).value
-  }
-  else if (typeof props.locale === 'string') {
-    currentLocale = props.locale
-  }
-
-  if (currentLocale && props.translate) {
-    return props.translate(`size.presets.${preset.name}`)
-  }
-
   if (props.translate) {
-    return props.translate(`size.presets.${preset.name}`)
+    const translated = props.translate(`size.presets.${preset.name}`)
+    // 如果翻译返回的是键本身，说明没有翻译，回退到 label
+    if (translated && !translated.startsWith('size.presets.')) {
+      return translated
+    }
   }
-
   return preset.label || preset.name
 }
 
-// 切换下拉菜单
-function toggleDropdown(e: MouseEvent) {
-  e.stopPropagation() // 阻止事件冒泡
-  isOpen.value = !isOpen.value
+// 获取预设描述
+function getPresetDesc(preset: SizePresetTheme): string {
+  const baseSize = preset.config?.baseSize || (preset as any).baseSize || 16
+  const scale = preset.config?.scale || (preset as any).scale || 1.25
+  return `${baseSize}px · ${scale}x`
 }
 
 // 选择预设
 function selectPreset(name: string) {
-  sizeManager?.applyPreset?.(name)
+  console.log('[SizeSwitcher] selectPreset:', name, 'sizeManager:', sizeManager)
+  if (sizeManager) {
+    try {
+      sizeManager.applyPreset(name)
+      // 更新响应式状态
+      currentPresetName.value = name
+      console.log('[SizeSwitcher] applyPreset success, currentPreset:', sizeManager.getCurrentPreset?.())
+    } catch (e) {
+      console.error('[SizeSwitcher] applyPreset error:', e)
+    }
+  }
   isOpen.value = false
 }
 
 // 点击外部关闭下拉菜单
-if (typeof window !== 'undefined') {
-  window.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('.ld-size-switcher')) {
-      isOpen.value = false
-    }
-  })
+const handleClickOutside = (e: MouseEvent) => {
+  if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
+    isOpen.value = false
+  }
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
-<style scoped>
-.ld-size-switcher {
+<style>
+/* SizeSwitcher 组件样式 - 参考 ThemeColorPicker */
+.ldesign-size-switcher {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
 }
 
-/* 尺寸按钮 - 仅显示图标 */
-.size-button {
+.ldesign-size-switcher__trigger {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--color-border, #d9d9d9);
-  border-radius: 6px;
-  background: var(--color-bg-container, #ffffff);
+  gap: 8px;
+  padding: 8px;
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
   cursor: pointer;
-  transition: all 0.2s;
-  color: var(--color-text-primary, #333);
+  transition: all 150ms ease-out;
+  color: #6b7280;
 }
 
-.size-button:hover {
-  border-color: var(--color-primary-hover, #40a9ff);
-  background: var(--color-bg-component-hover, #f5f5f5);
+.ldesign-size-switcher__trigger:hover {
+  border-color: var(--color-primary-400, #60a5fa);
+  background: var(--color-primary-50, #eff6ff);
+  color: var(--color-primary-500, #3b82f6);
 }
 
-/* 尺寸图标 */
-.size-icon {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
+.ldesign-size-switcher__trigger--small {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
 }
 
-/* 下拉面板 */
-.size-dropdown {
+.ldesign-size-switcher__trigger--large {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 12px;
+}
+
+.ldesign-size-switcher__dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 12px);
   right: 0;
-  width: 520px;
-  max-width: 90vw;
-  background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--color-border, #d9d9d9);
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  overflow: hidden;
-  animation: dropdown-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
 }
 
-/* 下拉头部 */
-.dropdown-header {
+.ldesign-size-switcher__arrow {
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-right: none;
+  border-bottom: none;
+  transform: rotate(45deg);
+  z-index: 10;
+}
+
+.ldesign-size-switcher__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border, #e8e8e8);
+  padding: 14px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #f9fafb;
+  border-radius: 12px 12px 0 0;
 }
 
-.dropdown-title {
-  font-size: 16px;
+.ldesign-size-switcher__title {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-primary, #333);
+  color: #1f2937;
+  margin: 0;
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
+.ldesign-size-switcher__list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ldesign-size-switcher__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ldesign-size-switcher__list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.ldesign-size-switcher__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.ldesign-size-switcher__item:hover {
+  background: #f3f4f6;
+}
+
+.ldesign-size-switcher__item--active {
+  background: var(--color-primary-50, #eff6ff);
+}
+
+.ldesign-size-switcher__item-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s;
-  font-size: 20px;
-  color: var(--color-text-secondary, #666);
-}
-
-.close-btn:hover {
-  background: var(--color-bg-component-hover, #f5f5f5);
-  color: var(--color-text-primary, #333);
-}
-
-/* 下拉内容 */
-.dropdown-content {
-  padding: 20px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-/* 尺寸网格 */
-.size-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-/* 尺寸卡片 */
-.size-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border: 2px solid var(--color-border, #e8e8e8);
-  border-radius: 8px;
-  background: var(--color-bg-container, #ffffff);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.size-card:hover {
-  border-color: var(--color-primary, #1890ff);
-  background: var(--color-bg-component-hover, #f5f5f5);
-}
-
-.size-card.active {
-  border-color: var(--color-primary, #1890ff);
-  background: var(--color-primary-bg, #e6f7ff);
-}
-
-/* 卡片图标 */
-.card-icon {
-  font-size: 24px;
+  width: 36px;
+  height: 36px;
   font-weight: 600;
-  line-height: 1;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 8px;
   flex-shrink: 0;
-  color: var(--color-text-primary, #333);
+  transition: all 150ms ease-out;
 }
 
-.size-card.active .card-icon {
-  color: var(--color-primary, #1890ff);
+.ldesign-size-switcher__item--active .ldesign-size-switcher__item-icon {
+  color: #ffffff;
+  background: var(--color-primary-500, #3b82f6);
 }
 
-/* 卡片信息 */
-.card-info {
+.ldesign-size-switcher__item-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-/* 卡片名称 */
-.card-name {
-  font-size: 15px;
+.ldesign-size-switcher__item-label {
+  font-size: 14px;
   font-weight: 500;
-  color: var(--color-text-primary, #333);
+  color: #1f2937;
+  line-height: 1.4;
 }
 
-.size-card.active .card-name {
-  color: var(--color-primary, #1890ff);
-}
-
-/* 卡片尺寸 */
-.card-size {
+.ldesign-size-switcher__item-desc {
   font-size: 12px;
-  opacity: 0.7;
-  font-family: 'Courier New', monospace;
+  color: #6b7280;
+  line-height: 1.4;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.ldesign-size-switcher__item--active .ldesign-size-switcher__item-label {
+  color: var(--color-primary-600, #2563eb);
+}
+
+.ldesign-size-switcher__check {
+  color: var(--color-primary-500, #3b82f6);
+  flex-shrink: 0;
 }
 
 /* 下拉动画 */
-@keyframes dropdown-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.ldesign-dropdown-enter-active {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* 暗色主题适配 */
-@media (prefers-color-scheme: dark) {
-  .size-button {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-    color: var(--color-text-primary, #e8e8e8);
-  }
+.ldesign-dropdown-leave-active {
+  transition: all 0.15s cubic-bezier(0.4, 0, 1, 1);
+}
 
-  .size-button:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-  }
+.ldesign-dropdown-enter-from,
+.ldesign-dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+}
 
-  .size-dropdown {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  }
+.ldesign-size-switcher--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
 
-  .dropdown-header {
-    border-bottom-color: var(--color-border, #434343);
-  }
+/* 暗色主题 */
+[data-theme-mode="dark"] .ldesign-size-switcher__trigger,
+[data-theme="dark"] .ldesign-size-switcher__trigger,
+.dark .ldesign-size-switcher__trigger {
+  background: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
 
-  .dropdown-title {
-    color: var(--color-text-primary, #e8e8e8);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__trigger:hover,
+[data-theme="dark"] .ldesign-size-switcher__trigger:hover,
+.dark .ldesign-size-switcher__trigger:hover {
+  background: #4b5563;
+  border-color: var(--color-primary-400, #60a5fa);
+}
 
-  .close-btn {
-    color: var(--color-text-secondary, #999);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__dropdown,
+[data-theme="dark"] .ldesign-size-switcher__dropdown,
+.dark .ldesign-size-switcher__dropdown {
+  background: #1f2937;
+  border-color: #374151;
+}
 
-  .close-btn:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-    color: var(--color-text-primary, #e8e8e8);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__arrow,
+[data-theme="dark"] .ldesign-size-switcher__arrow,
+.dark .ldesign-size-switcher__arrow {
+  background: #111827;
+  border-color: #374151;
+}
 
-  .size-card {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--color-border, #434343);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__header,
+[data-theme="dark"] .ldesign-size-switcher__header,
+.dark .ldesign-size-switcher__header {
+  background: #111827;
+  border-color: #374151;
+}
 
-  .size-card:hover {
-    background: var(--color-bg-component-hover, #2a2a2a);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__title,
+[data-theme="dark"] .ldesign-size-switcher__title,
+.dark .ldesign-size-switcher__title {
+  color: #f3f4f6;
+}
 
-  .size-card.active {
-    background: var(--color-primary-bg, #111d2c);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__item:hover,
+[data-theme="dark"] .ldesign-size-switcher__item:hover,
+.dark .ldesign-size-switcher__item:hover {
+  background: #374151;
+}
 
-  .card-icon,
-  .card-name {
-    color: var(--color-text-primary, #e8e8e8);
-  }
+[data-theme-mode="dark"] .ldesign-size-switcher__item--active,
+[data-theme="dark"] .ldesign-size-switcher__item--active,
+.dark .ldesign-size-switcher__item--active {
+  background: var(--color-primary-900, rgba(59, 130, 246, 0.15));
+}
+
+[data-theme-mode="dark"] .ldesign-size-switcher__item-icon,
+[data-theme="dark"] .ldesign-size-switcher__item-icon,
+.dark .ldesign-size-switcher__item-icon {
+  background: #374151;
+  color: #9ca3af;
+}
+
+[data-theme-mode="dark"] .ldesign-size-switcher__item--active .ldesign-size-switcher__item-icon,
+[data-theme="dark"] .ldesign-size-switcher__item--active .ldesign-size-switcher__item-icon,
+.dark .ldesign-size-switcher__item--active .ldesign-size-switcher__item-icon {
+  background: var(--color-primary-500, #3b82f6);
+  color: #ffffff;
+}
+
+[data-theme-mode="dark"] .ldesign-size-switcher__item-label,
+[data-theme="dark"] .ldesign-size-switcher__item-label,
+.dark .ldesign-size-switcher__item-label {
+  color: #f3f4f6;
+}
+
+[data-theme-mode="dark"] .ldesign-size-switcher__item-desc,
+[data-theme="dark"] .ldesign-size-switcher__item-desc,
+.dark .ldesign-size-switcher__item-desc {
+  color: #9ca3af;
 }
 </style>
