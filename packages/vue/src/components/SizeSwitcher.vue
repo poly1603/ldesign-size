@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" :class="containerClass">
+  <div ref="containerRef" :class="containerClass" :data-variant="variant || 'light'">
     <button type="button" :class="triggerClass" :disabled="disabled" :title="sizeTooltip" @click="isOpen = !isOpen">
       <Type :size="18" :stroke-width="2" />
     </button>
@@ -44,6 +44,7 @@ const props = defineProps<{
   title?: string
   translate?: (key: string) => string
   locale?: string | { value: string }
+  variant?: 'light' | 'primary'
 }>()
 
 // 获取当前组件实例，访问全局属性
@@ -193,6 +194,36 @@ onUnmounted(() => {
   border-color: var(--color-primary-400, #60a5fa);
   background: var(--color-primary-50, #eff6ff);
   color: var(--color-primary-500, #3b82f6);
+}
+
+/* ===== Variant-based trigger styling ===== */
+.header-actions[data-variant="light"] .ldesign-size-switcher__trigger,
+.ldesign-size-switcher[data-variant="light"] .ldesign-size-switcher__trigger,
+.ldesign-size-switcher[variant="light"] .ldesign-size-switcher__trigger {
+  background: var(--color-bg-hover, #f3f4f6);
+  border-color: var(--color-border, #e5e7eb);
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.header-actions[data-variant="light"] .ldesign-size-switcher__trigger:hover,
+.ldesign-size-switcher[data-variant="light"] .ldesign-size-switcher__trigger:hover,
+.ldesign-size-switcher[variant="light"] .ldesign-size-switcher__trigger:hover {
+  background: var(--color-fill-tertiary, #eef2f7);
+}
+
+.header-actions[data-variant="primary"] .ldesign-size-switcher__trigger,
+.ldesign-size-switcher[data-variant="primary"] .ldesign-size-switcher__trigger,
+.ldesign-size-switcher[variant="primary"] .ldesign-size-switcher__trigger {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--color-text-inverse, #ffffff);
+}
+
+.header-actions[data-variant="primary"] .ldesign-size-switcher__trigger:hover,
+.ldesign-size-switcher[data-variant="primary"] .ldesign-size-switcher__trigger:hover,
+.ldesign-size-switcher[variant="primary"] .ldesign-size-switcher__trigger:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .ldesign-size-switcher__trigger--small {
