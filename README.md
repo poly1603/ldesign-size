@@ -1,375 +1,237 @@
 # @ldesign/size
 
-> 🎯 页面尺寸缩放功能包 - 让你的网页支持动态尺寸切换，提升用户体验！
+> 页面尺寸缩放管理库 - 让你的网页支持动态尺寸切换
 
 [![npm version](https://img.shields.io/npm/v/@ldesign/size.svg)](https://www.npmjs.com/package/@ldesign/size)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-green.svg)](https://vuejs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ 特性
 
-- 🚀 **开箱即用** - 零配置快速上手，一行代码启用尺寸缩放
-- 🎨 **动态 CSS 变量** - 智能生成完整的 CSS 变量系统，覆盖字体、间距、组件尺寸等
-- 🔧 **框架支持** - 支持 Vue 3 及原生 JS
-- 💎 **完整 Vue 3 生态** - 提供专用 Plugin、Composables 和组件
-- 📱 **响应式友好** - 完美适配移动端，支持多种尺寸模式切换
-- 🎯 **TypeScript 优先** - 完整的类型定义，零 TS 错误，极佳的开发体验
-- ⚡ **性能优越** - 双向链表 LRU (O(1))，环形缓冲区，性能提升 5x+，内存优化 50%+
-- 🧠 **智能内存管理** - 全局内存监控，自动清理，内存占用估算
-- 🛠️ **高度可定制** - 支持自定义前缀、选择器、配置等
-- 📊 **性能监控** - 实时监控性能指标，可导出详细报告
-- 🎬 **丰富动画** - 6 种内置动画预设，支持自定义贝塞尔曲线
-- 🎨 **预设管理** - 4 种内置预设（紧凑、舒适、演示等），支持自定义
+- 🚀 **开箱即用** - 零配置快速上手
+- 🎨 **CSS 变量** - 智能生成完整的 CSS 变量系统
+- 🔧 **多框架支持** - Vue 3 及原生 JS
+- ⚡ **高性能** - 节流机制、LRU 缓存、批量通知
+- 📱 **响应式** - 完美适配移动端
+- 🎯 **TypeScript** - 完整类型定义
 
-## 🚀 快速开始
-
-### 安装
+## 📦 安装
 
 ```bash
-# 使用 pnpm (推荐)
+# pnpm (推荐)
 pnpm add @ldesign/size
 
-# 使用 npm
+# npm
 npm install @ldesign/size
 
-# 使用 yarn
+# yarn
 yarn add @ldesign/size
 ```
 
-### 基础使用
+## 🚀 快速开始
 
-```javascript
-import { globalSizeManager } from '@ldesign/size'
+### 原生 JavaScript
 
-// 设置尺寸模式
-globalSizeManager.setMode('large')
+```typescript
+import { sizeManager } from '@ldesign/size'
 
-// 监听尺寸变化
-globalSizeManager.onSizeChange((event) => {
-  console.log('尺寸变化:', event.currentMode)
+// 应用预设
+sizeManager.applyPreset('comfortable')
+
+// 监听变化
+sizeManager.subscribe((config) => {
+  console.log('尺寸变化:', config.baseSize)
 })
+
+// 自定义基础尺寸
+sizeManager.setBaseSize(18)
 ```
 
-### Vue 3 项目使用
+### Vue 3
 
-```javascript
+```typescript
+// main.ts
 import { createApp } from 'vue'
 import { createSizePlugin } from '@ldesign/size-vue'
 import App from './App.vue'
 
 const app = createApp(App)
-
-// 安装插件
-app.use(createSizePlugin({
-  defaultPreset: 'medium',
-}))
-
+app.use(createSizePlugin({ defaultPreset: 'comfortable' }))
 app.mount('#app')
 ```
 
 ```vue
-<!-- 在组件中使用 -->
+<!-- 组件中使用 -->
 <script setup>
-import { useSize, SizeSelector } from '@ldesign/size-vue'
+import { useSize, SizeSwitcher } from '@ldesign/size-vue'
 
 const { currentPreset, applyPreset } = useSize()
 </script>
 
 <template>
   <div>
-    <!-- 使用组件 -->
-    <SizeSelector variant="buttons" />
-
-    <!-- 使用 Composition API -->
-    <div>当前模式: {{ currentPreset }}</div>
+    <SizeSwitcher />
+    <p>当前预设: {{ currentPreset }}</p>
   </div>
 </template>
 ```
 
-## 🎨 包结构
+## 🎨 内置预设
 
-@ldesign/size 采用 monorepo 架构，提供了核心包和 Vue 3 封装：
+| 预设 | 描述 | 基础尺寸 | 适用场景 |
+|-----|------|---------|--------|
+| `compact` | 紧凑 | 14px | 信息密集型界面 |
+| `comfortable` | 舒适 | 16px | 日常使用 |
+| `default` | 默认 | 16px | 标准设置 |
+| `spacious` | 宽松 | 18px | 无障碍访问 |
 
-| 包名 | 说明 | 状态管理 | Provider/Plugin | 组件 |
-|------|------|----------|----------------|------|
-| **@ldesign/size-core** | 框架无关的核心包，包含所有底层逻辑 | - | - | - |
-| **@ldesign/size-vue** | Vue 3 专用封装，提供 Plugin、Composables 和组件 | Composition API | Plugin | ✅ |
+## 📖 API
 
-### 包说明
-
-- **@ldesign/size-core**: 框架无关的核心包，提供完整的尺寸管理系统
-  - 尺寸管理器 (SizeManager)
-  - CSS 变量生成
-  - 性能优化和缓存
-  - 类型定义
-  
-- **@ldesign/size-vue**: Vue 3 专用封装
-  - Vue 插件系统
-  - Composition API (useSize)
-  - 响应式组件 (SizeSelector, SizeSwitcher 等)
-  - 完整的 TypeScript 支持
-
-## 🎨 尺寸模式
-
-支持四种内置尺寸模式，每种模式都有完整的设计规范：
-
-| 模式          | 描述     | 基础字体 | 基础间距 | 适用场景           |
-| ------------- | -------- | -------- | -------- | ------------------ |
-| `small`       | 小尺寸   | 12px     | 8px      | 移动端、紧凑布局   |
-| `medium`      | 中等尺寸 | 16px     | 16px     | 桌面端标准         |
-| `large`       | 大尺寸   | 18px     | 20px     | 大屏显示、老年友好 |
-| `extra-large` | 超大尺寸 | 20px     | 24px     | 超大屏、演示模式   |
-
-## 🛠️ API 文档
-
-### 核心 API
+### SizeManager
 
 ```typescript
-import { createSizeManager, getSizeConfig, globalSizeManager, type SizeMode } from '@ldesign/size'
+import { sizeManager, SizeManager } from '@ldesign/size'
 
-// 创建管理器
-const manager = createSizeManager({
-  defaultMode: 'medium',
-  prefix: '--ls',
-  autoInject: true,
+// 使用单例
+sizeManager.applyPreset('comfortable')
+
+// 或创建新实例
+const manager = new SizeManager({
+  storageKey: 'my-app-size',
+  defaultPreset: 'comfortable',
+  enableThrottle: true
 })
-
-// 基础操作
-manager.setMode('large')
-manager.getCurrentMode() // 'large'
-manager.getConfig() // 获取当前配置
-manager.generateCSSVariables() // 生成CSS变量
 ```
 
-### 新增功能 API
+**方法:**
 
-```typescript
-// 性能监控
-import { globalPerformanceMonitor } from '@ldesign/size'
-globalPerformanceMonitor.enable()
-globalPerformanceMonitor.printReport()
+| 方法 | 描述 |
+|-----|------|
+| `applyPreset(name)` | 应用预设 |
+| `setBaseSize(size)` | 设置基础尺寸 |
+| `getCurrentPreset()` | 获取当前预设名称 |
+| `getConfig()` | 获取当前配置 |
+| `getPresets()` | 获取所有预设 |
+| `subscribe(listener)` | 监听配置变化 |
+| `addPreset(preset)` | 添加自定义预设 |
+| `destroy()` | 销毁实例 |
 
-// 缓存管理
-import { globalCSSVariableCache } from '@ldesign/size'
-console.log('命中率:', globalCSSVariableCache.getHitRate())
-
-// 预设管理
-import { globalPresetManager } from '@ldesign/size'
-globalPresetManager.apply('compact', 'medium')
-
-// 动画管理
-import { globalAnimationManager } from '@ldesign/size'
-globalAnimationManager.applyPreset('bounce')
-
-// 响应式管理
-import { createResponsiveSize } from '@ldesign/size'
-createResponsiveSize({ autoApply: true })
-```
-
-### Vue 3 API
+### Vue Composables
 
 ```typescript
 import { useSize } from '@ldesign/size-vue'
 
-const { currentPreset, applyPreset, config, presets } = useSize()
+const { 
+  config,        // 当前配置 (readonly)
+  currentPreset, // 当前预设名称 (readonly)
+  presets,       // 预设列表 (computed)
+  setBaseSize,   // 设置基础尺寸
+  applyPreset    // 应用预设
+} = useSize()
 ```
 
-**主要 Composables:**
-- `useSize()` - 核心 Hook，提供响应式的尺寸管理
+### Vue 组件
 
-**可用组件:**
-- `<SizePresetPicker />` - 预设选择器
-- `<SizeSwitcher />` - 尺寸切换器
+```vue
+<!-- 尺寸切换器 -->
+<SizeSwitcher 
+  variant="light" 
+  size="medium"
+  @change="onSizeChange"
+/>
 
-## 🎯 使用场景
-
-### 1. 无障碍访问
-
-为视力不佳的用户提供大字体模式，提升网站可访问性。
-
-```typescript
-import { globalPresetManager } from '@ldesign/size'
-// 应用舒适阅读预设
-globalPresetManager.apply('comfortable', 'large')
+<!-- 预设选择器 -->
+<SizePresetPicker />
 ```
 
-### 2. 多设备适配
+## 🎯 CSS 变量
 
-根据设备屏幕大小自动调整界面尺寸，提供最佳用户体验。
+应用预设后，以下 CSS 变量会自动注入到 `:root`：
 
-```typescript
-import { createResponsiveSize } from '@ldesign/size'
-// 自动适配设备
-createResponsiveSize({ autoApply: true })
+```css
+/* 基础尺寸 */
+--size-base: 16px;
+--size-scale: 1;
+
+/* 字体尺寸 */
+--size-font-xs: 11px;
+--size-font-sm: 12px;
+--size-font-base: 14px;
+--size-font-md: 16px;
+--size-font-lg: 18px;
+--size-font-xl: 20px;
+
+/* 间距 */
+--size-spacing-xs: 4px;
+--size-spacing-sm: 6px;
+--size-spacing-md: 8px;
+--size-spacing-lg: 12px;
+--size-spacing-xl: 16px;
+
+/* 圆角 */
+--size-radius-sm: 4px;
+--size-radius-md: 6px;
+--size-radius-lg: 8px;
+
+/* 更多变量... */
 ```
 
-### 3. 用户偏好
+## 📁 包结构
 
-让用户根据个人喜好选择合适的界面尺寸。
-
-```typescript
-import { globalSizeManager } from '@ldesign/size'
-// 保存用户偏好
-globalSizeManager.onSizeChange((event) => {
-  localStorage.setItem('user-size', event.currentMode)
-})
 ```
-
-### 4. 演示模式
-
-在演示或展示时使用大尺寸模式，确保内容清晰可见。
-
-```typescript
-import { globalPresetManager, globalAnimationManager } from '@ldesign/size'
-// 应用演示预设 + 平滑动画
-globalPresetManager.apply('presentation', 'extra-large')
-globalAnimationManager.applyPreset('smooth')
-```
-
-### 5. 性能监控
-
-开发环境实时监控性能，优化用户体验。
-
-```typescript
-import { globalPerformanceMonitor } from '@ldesign/size'
-if (process.env.NODE_ENV === 'development') {
-  globalPerformanceMonitor.enable()
-  globalPerformanceMonitor.printReport()
-}
-```
-
-## 🔧 重要修复说明
-
-### 路由切换样式丢失问题修复
-
-**问题描述**：在Vue应用中，路由切换时可能出现尺寸相关的CSS样式丢失问题。
-
-**根本原因**：某些Vue组件在使用`useSize`等hooks时创建了独立的SizeManager实例，当组件卸载时会调用`destroy()`方法移除CSS样式。
-
-**修复方案**：
-- 所有Vue hooks（`useSizeSwitcher`、`useSizeWatcher`、`useSmartSize`等）现在默认使用全局管理器
-- `useSize` hook在没有注入管理器时会回退到全局管理器而不是创建新实例
-- 增强了组件卸载时的保护逻辑，避免误删全局样式
-
-**使用建议**：
-```typescript
-// ✅ 推荐：明确使用全局管理器
-const { currentMode, setMode } = useSize({ global: true })
-
-// ✅ 现在也安全：会自动使用全局管理器
-const { currentMode, setMode } = useSizeSwitcher()
-```
-
-## 📱 示例项目
-
-我们提供了完整的示例项目来展示各种使用方式：
-
-- **Vue 示例**: `examples/vue/` - 展示在 Vue 项目中的完整使用方式
-- **原生 JS 示例**: `examples/vanilla/` - 展示在纯 JavaScript 环境中的使用方式
-
-```bash
-# 运行Vue示例
-cd examples/vue
-pnpm install
-pnpm dev
-
-# 运行原生JS示例
-cd examples/vanilla
-pnpm install
-pnpm dev
+@ldesign/size (monorepo)
+├── @ldesign/size-core  # 框架无关的核心
+└── @ldesign/size-vue   # Vue 3 封装
 ```
 
 ## 🔧 高级配置
 
-### 自定义 CSS 变量前缀
+### 自定义预设
 
-```javascript
-const manager = createSizeManager({
-  prefix: '--my-app', // 自定义前缀
-  selector: '.my-container', // 自定义选择器
+```typescript
+import { sizeManager } from '@ldesign/size'
+
+sizeManager.addPreset({
+  name: 'extra-large',
+  label: '超大',
+  description: '适合大屏展示',
+  baseSize: 20,
+  category: 'accessibility'
 })
+
+sizeManager.applyPreset('extra-large')
 ```
 
-### 自定义尺寸配置
+### Vue 插件配置
 
-```javascript
-import { createSizeManager } from '@ldesign/size'
-
-const customConfig = {
-  fontSize: {
-    base: '18px',
-    lg: '22px',
-    // ... 其他配置
-  },
-  spacing: {
-    base: '20px',
-    // ... 其他配置
-  },
-}
-
-// 使用自定义配置（需要扩展功能）
+```typescript
+app.use(createSizePlugin({
+  defaultPreset: 'comfortable',
+  storageKey: 'my-app-size',
+  globalProperties: true, // 注册 $sizeManager
+  hooks: {
+    beforeChange: (newSize, oldSize) => true,
+    afterChange: (newSize) => console.log('Changed:', newSize)
+  }
+}))
 ```
 
-## 🤝 贡献指南
-
-我们欢迎所有形式的贡献！请查看 [CONTRIBUTING.md](../../CONTRIBUTING.md) 了解详细信息。
-
-### 开发环境设置
+## 🛠️ 开发
 
 ```bash
-# 克隆项目
-git clone https://github.com/ldesign/ldesign.git
-cd ldesign
-
 # 安装依赖
 pnpm install
-
-# 进入size包目录
-cd packages/size
 
 # 开发模式
 pnpm dev
 
-# 运行测试
-pnpm test
-
 # 构建
 pnpm build
+
+# 测试
+pnpm test
 ```
 
-## 📄 许可证
+## 📄 License
 
-[MIT License](./LICENSE) © LDesign Team
-
-## 🔗 相关链接
-
-### 快速开始
-- [快速开始指南](./QUICK_START.md) - 5 分钟上手
-- [高级使用示例](./docs/examples/advanced-usage.md) - 深入学习
-
-### 包文档
-- [核心包文档](./packages/core/README.md) - 框架无关的核心 API
-- [Vue 3 包文档](./packages/vue/README.md) - Vue 3 专用 API 和组件
-
-### 文档
-- [完整文档](./docs/README.md)
-- [核心 API](./docs/api/core.md)
-- [Vue API](./docs/api/vue.md)
-- [类型定义](./docs/api/types.md)
-- [最佳实践](./docs/best-practices/README.md)
-
-### 优化报告
-- [优化总结](./OPTIMIZATION_SUMMARY.md) - 性能提升详情
-- [最终报告](./FINAL_OPTIMIZATION_REPORT.md) - 完整优化报告
-
-### 其他
-- [更新日志](./CHANGELOG.md)
-- [问题反馈](https://github.com/ldesign/ldesign/issues)
-
----
-
-<div align="center">
-  <p>如果这个项目对你有帮助，请给我们一个 ⭐️ Star！</p>
-  <p>Made with ❤️ by LDesign Team</p>
-</div>
+[MIT](./LICENSE) © LDesign Team

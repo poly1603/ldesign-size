@@ -45,7 +45,7 @@ export interface SizeSpecDoc {
   version: string;
   generated: Date;
   config: SizeConfig;
-  presets: SizePreset[];
+  presets: ReadonlyArray<Readonly<SizePreset>>;
   variables: Record<string, string>;
   usage: SizeUsageReport;
 }

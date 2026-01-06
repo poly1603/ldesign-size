@@ -99,10 +99,10 @@ export class BaseSizeAdapter {
 
     // 初始化管理器
     this.manager = new SizeManager({
-      baseSize,
-      scale,
-      unit,
-    } as SizeConfig)
+      storageKey: persistence.key,
+    })
+    // 设置初始基础尺寸
+    this.manager.setBaseSize(baseSize)
 
     // 合并内置预设和自定义预设
     const mergedPresets = customPresets
@@ -176,11 +176,7 @@ export class BaseSizeAdapter {
     this.state.unit = preset.config.unit
 
     // 应用到管理器
-    this.manager.setConfig({
-      baseSize: preset.config.baseSize,
-      scale: preset.config.scale,
-      unit: preset.config.unit,
-    } as SizeConfig)
+    this.manager.setBaseSize(preset.config.baseSize)
 
     // 保存到存储
     if (this.persistenceConfig.enabled) {
@@ -222,7 +218,7 @@ export class BaseSizeAdapter {
    */
   setBaseSize(size: number): void {
     this.state.baseSize = size
-    this.manager.setConfig({ baseSize: size } as SizeConfig)
+    this.manager.setBaseSize(size)
 
     if (this.persistenceConfig.enabled) {
       this.saveToStorage()
@@ -245,8 +241,7 @@ export class BaseSizeAdapter {
    */
   setScale(scale: number): void {
     this.state.scale = scale
-    this.manager.setConfig({ scale } as SizeConfig)
-
+    // Note: SizeManager 不再直接支持 scale，保留在适配器状态中
     if (this.persistenceConfig.enabled) {
       this.saveToStorage()
     }
@@ -267,8 +262,15 @@ export class BaseSizeAdapter {
    * @param level - 尺寸等级
    * @returns 计算后的尺寸值
    */
+  /**
+   * 计算尺寸值
+   *
+   * @param level - 尺寸等级
+   * @returns 计算后的尺寸值
+   */
   compute(level: number): number {
-    return this.manager.compute(level)
+    // 使用基础尺寸和缩放比例计算
+    return Math.round(this.state.baseSize * Math.pow(this.state.scale, level))
   }
 
   /**
@@ -329,11 +331,7 @@ export class BaseSizeAdapter {
       this.state.scale = data.scale ?? 1.25
       this.state.unit = data.unit ?? 'px'
 
-      this.manager.setConfig({
-        baseSize: this.state.baseSize,
-        scale: this.state.scale,
-        unit: this.state.unit,
-      } as SizeConfig)
+      this.manager.setBaseSize(this.state.baseSize)
 
       return true
     }

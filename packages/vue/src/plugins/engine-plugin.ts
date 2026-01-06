@@ -304,14 +304,14 @@ export function createSizeEnginePlugin(
           name: 'size',
           version: version || '1.0.0',
           applyPreset: (preset: string) => sizeAdapter.applyPreset(preset),
-          getCurrentPreset: () => sizeAdapter.getCurrentPreset(),
+          getCurrentPreset: () => sizeAdapter.getCurrentPreset()?.name ?? null,
           setBaseSize: (size: number) => sizeAdapter.setBaseSize(size),
           getBaseSize: () => sizeAdapter.getBaseSize(),
           setScale: (scale: number) => sizeAdapter.setScale(scale),
           getScale: () => sizeAdapter.getScale(),
-          getPresets: () => sizeAdapter.getPresets(),
+          getPresets: () => sizeAdapter.getPresets() as unknown as Record<string, unknown>[],
           compute: (level: number) => sizeAdapter.compute(level),
-          getState: () => sizeAdapter.getState(),
+          getState: () => sizeAdapter.getState() as unknown as Record<string, unknown>,
         };
         (engine as any).api.register(sizeAPI)
         if (debug) {

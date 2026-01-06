@@ -148,7 +148,7 @@ class SizePool {
    * @param rootFontSize - 根字体大小
    * @returns Size 对象实例
    */
-  acquire(input: SizeInput, rootFontSize = DEFAULT_ROOT_FONT_SIZE): Size {
+  acquire(input: SizeInput, rootFontSize: number = DEFAULT_ROOT_FONT_SIZE): Size {
     if (this.destroyed) {
       // 如果池已销毁，直接创建新对象
       return new Size(input, rootFontSize)
@@ -183,11 +183,11 @@ class SizePool {
     // 清理对象状态并归还到池中
     if ((size as any)._isPooled && this.pool.length < this.maxSize) {
       // 重置为零值状态
-      (size as any)._value = ZERO_PX
-        (size as any)._rootFontSize = DEFAULT_ROOT_FONT_SIZE
-          (size as any)._flags = FLAG_POOLED
-            (size as any)._cachedPixels = undefined
-              (size as any)._cachedRem = undefined
+      ;(size as any)._value = ZERO_PX
+      ;(size as any)._rootFontSize = DEFAULT_ROOT_FONT_SIZE
+      ;(size as any)._flags = FLAG_POOLED
+      ;(size as any)._cachedPixels = undefined
+      ;(size as any)._cachedRem = undefined
       this.pool.push(size)
     }
   }
@@ -265,7 +265,7 @@ export class Size {
     }
   }
 
-  constructor(input: SizeInput = 0, rootFontSize = DEFAULT_FONT_SIZE) {
+  constructor(input: SizeInput = 0, rootFontSize: number = DEFAULT_FONT_SIZE) {
     this._value = parseSizeInput(input);
     this._rootFontSize = rootFontSize;
   }
@@ -273,7 +273,7 @@ export class Size {
   /**
    * 重置对象状态（供对象池使用）
    */
-  reset(input: SizeInput = 0, rootFontSize = DEFAULT_FONT_SIZE): void {
+  reset(input: SizeInput = 0, rootFontSize: number = DEFAULT_FONT_SIZE): void {
     this._value = parseSizeInput(input);
     this._rootFontSize = rootFontSize;
     // 使用位操作设置标记
@@ -306,14 +306,14 @@ export class Size {
   /**
    * Create a Size from rem
    */
-  static fromRem(value: number, rootFontSize = DEFAULT_FONT_SIZE): Size {
+  static fromRem(value: number, rootFontSize: number = DEFAULT_FONT_SIZE): Size {
     return new Size({ value, unit: UNIT_REM }, rootFontSize);
   }
 
   /**
    * Create a Size from em
    */
-  static fromEm(value: number, rootFontSize = DEFAULT_FONT_SIZE): Size {
+  static fromEm(value: number, rootFontSize: number = DEFAULT_FONT_SIZE): Size {
     return new Size({ value, unit: UNIT_EM }, rootFontSize);
   }
 
@@ -341,7 +341,7 @@ export class Size {
   /**
    * Parse a string to Size
    */
-  static parse(input: string, rootFontSize = DEFAULT_FONT_SIZE): Size {
+  static parse(input: string, rootFontSize: number = DEFAULT_FONT_SIZE): Size {
     return new Size(input, rootFontSize);
   }
 
@@ -377,6 +377,13 @@ export class Size {
 
   get em(): number {
     return this.toEm().value;
+  }
+
+  /**
+   * 获取根字体大小
+   */
+  get rootFontSize(): number {
+    return this._rootFontSize;
   }
 
   // ============================================
@@ -664,6 +671,20 @@ export class Size {
   }
 
   /**
+   * 大于或等于（greaterThanOrEqual 的别名）
+   */
+  gte(other: SizeInput): boolean {
+    return this.greaterThanOrEqual(other)
+  }
+
+  /**
+   * 小于或等于（lessThanOrEqual 的别名）
+   */
+  lte(other: SizeInput): boolean {
+    return this.lessThanOrEqual(other)
+  }
+
+  /**
    * 获取此尺寸与另一个尺寸的最小值
    * 
    * @param other - 要比较的尺寸
@@ -855,9 +876,11 @@ export class Size {
     targetUnit: SizeUnit,
     options?: SizeCalculationOptions
   ): Size[] {
+    const rootFontSize = options?.rootFontSize ?? DEFAULT_FONT_SIZE
     return inputs.map(input => {
-      const size = new Size(input, options?.rootFontSize)
-      return size.to(targetUnit, options)
+      const size = new Size(input, rootFontSize)
+      const converted = size.to(targetUnit)
+      return new Size(converted, rootFontSize)
     })
   }
 
@@ -1027,7 +1050,7 @@ export class Size {
     return {
       value: this.value,
       unit: this.unit,
-      pixels: this.toPixels(),
+      pixels: this.toPixels().value,
       formatted: this.toString(),
     }
   }
@@ -1087,8 +1110,8 @@ export class Size {
       value: this.value,
       unit: this.unit,
       rootFontSize: this.rootFontSize,
-      pixels: this.toPixels(),
-      rem: this.toRem(),
+      pixels: this.toPixels().value,
+      rem: this.toRem().value,
       formatted: this.toString(),
       isValid: this.value >= 0 && Number.isFinite(this.value),
     }
@@ -1125,7 +1148,7 @@ if (COMMON_VALUES_CACHE.size === 0) {
 const sizeCache = new Map<string, Size>();
 const MAX_CACHE_SIZE = 50;
 
-export const size = (input: SizeInput, rootFontSize = 16) => {
+export const size = (input: SizeInput, rootFontSize: number = 16) => {
   // 对于常用值使用缓存
   if (typeof input === 'number') {
     const cacheKey = `${input}:${rootFontSize}`;
@@ -1149,8 +1172,8 @@ export const size = (input: SizeInput, rootFontSize = 16) => {
   return new Size(input, rootFontSize);
 };
 export const px = (value: number) => Size.fromPixels(value);
-export const rem = (value: number, rootFontSize = 16) => Size.fromRem(value, rootFontSize);
-export const em = (value: number, rootFontSize = 16) => Size.fromEm(value, rootFontSize);
+export const rem = (value: number, rootFontSize: number = 16) => Size.fromRem(value, rootFontSize);
+export const em = (value: number, rootFontSize: number = 16) => Size.fromEm(value, rootFontSize);
 export const vw = (value: number) => Size.fromViewportWidth(value);
 export const vh = (value: number) => Size.fromViewportHeight(value);
 export const percent = (value: number) => Size.fromPercentage(value);

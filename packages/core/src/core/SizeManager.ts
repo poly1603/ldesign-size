@@ -12,6 +12,7 @@
  * - 批量通知监听器减少重绘
  * - LRU 缓存策略限制内存占用
  * - 预计算常用尺寸值
+ * - 节流机制防止频繁更新
  * 
  * @example
  * ```ts
@@ -26,6 +27,8 @@
  *   console.log('尺寸变化:', config.baseSize)
  * })
  * ```
+ * 
+ * @module SizeManager
  */
 
 import { PERFORMANCE_CONFIG } from '../constants/performance'
@@ -33,10 +36,13 @@ import { SIZE_CONFIG, SIZE_MULTIPLIERS, CSS_IDENTIFIERS } from '../constants/siz
 
 /**
  * 尺寸配置接口
+ * 
+ * @interface SizeConfig
+ * @property {number} baseSize - 基础字体大小（像素），范围 10-24
  */
 export interface SizeConfig {
-  /** 基础字体大小（像素） */
-  baseSize: number
+  /** 基础字体大小（像素），有效范围：10-24 */
+  readonly baseSize: number
 }
 
 /**
@@ -45,92 +51,190 @@ export interface SizeConfig {
 export type SizeScheme = SizeConfig
 
 /**
- * 尺寸预设接口
+ * 尺寸预设名称类型
+ * 
+ * @type {SizePresetName}
  */
-export interface SizePreset {
+export type SizePresetName = 'compact' | 'comfortable' | 'default' | 'spacious' | (string & {})
+
+/**
+ * 预设分类类型
+ */
+export type PresetCategory = 'density' | 'accessibility' | 'custom'
+
+/**
+ * 尺寸预设接口
+ * 
+ * @interface SizePreset
+ * @template T - 预设名称类型
+ */
+export interface SizePreset<T extends string = SizePresetName> {
   /** 预设名称（唯一标识） */
-  name: string
-  /** 显示标签 */
-  label: string
+  readonly name: T
+  /** 显示标签（用于 UI 展示） */
+  readonly label: string
   /** 描述文本 */
-  description?: string
-  /** 基础尺寸值 */
-  baseSize: number
+  readonly description?: string
+  /** 基础尺寸值（像素） */
+  readonly baseSize: number
   /** 分类（可选） */
-  category?: string
+  readonly category?: PresetCategory
+  /** 图标（可选，用于 UI） */
+  readonly icon?: string
 }
 
 /**
  * 尺寸变化监听器类型
+ * 
+ * @callback SizeChangeListener
+ * @param {SizeConfig} config - 新的尺寸配置
  */
 export type SizeChangeListener = (config: SizeConfig) => void
 
+/**
+ * SizeManager 构造选项
+ * 
+ * @interface SizeManagerOptions
+ */
+export interface SizeManagerOptions {
+  /** localStorage 存储键名 */
+  readonly storageKey?: string
+  /** 自定义预设数组 */
+  readonly presets?: ReadonlyArray<SizePreset>
+  /** 默认预设名称 */
+  readonly defaultPreset?: SizePresetName
+  /** 是否启用节流（默认 true） */
+  readonly enableThrottle?: boolean
+  /** 节流延迟（毫秒，默认 16ms） */
+  readonly throttleDelay?: number
+}
+
 // 使用配置常量
 const DEFAULT_STORAGE_KEY = SIZE_CONFIG.DEFAULT_STORAGE_KEY
-const { MAX_CSS_CACHE_SIZE, LISTENER_BATCH_SIZE } = PERFORMANCE_CONFIG
+const { MAX_CSS_CACHE_SIZE, LISTENER_BATCH_SIZE, FRAME_BUDGET } = PERFORMANCE_CONFIG
 const { SIZE_STYLE_ID } = CSS_IDENTIFIERS
 
-// Default presets
-const defaultPresets: SizePreset[] = [
-  {
-    name: 'compact',
-    label: 'Compact',
-    description: 'High density for maximum content',
+/** 默认预设配置（不可变） */
+const DEFAULT_PRESETS: ReadonlyArray<Readonly<SizePreset>> = Object.freeze([
+  Object.freeze({
+    name: 'compact' as const,
+    label: '紧凑',
+    description: '高密度布局，适合信息密集型界面',
     baseSize: 14,
-    category: 'density'
-  },
-  {
-    name: 'comfortable',
-    label: 'Comfortable',
-    description: 'Balanced spacing for everyday use',
+    category: 'density' as const,
+    icon: 'compress'
+  }),
+  Object.freeze({
+    name: 'comfortable' as const,
+    label: '舒适',
+    description: '平衡的间距，适合日常使用',
     baseSize: 16,
-    category: 'density'
-  },
-  {
-    name: 'default',
-    label: 'Default',
-    description: 'Standard size settings',
+    category: 'density' as const,
+    icon: 'layout'
+  }),
+  Object.freeze({
+    name: 'default' as const,
+    label: '默认',
+    description: '标准尺寸设置',
     baseSize: 16,
-    category: 'density'
-  },
-  {
-    name: 'spacious',
-    label: 'Spacious',
-    description: 'Lower density for better readability',
+    category: 'density' as const,
+    icon: 'check'
+  }),
+  Object.freeze({
+    name: 'spacious' as const,
+    label: '宽松',
+    description: '低密度布局，适合无障碍访问',
     baseSize: 18,
-    category: 'density'
+    category: 'accessibility' as const,
+    icon: 'expand'
+  })
+])
+
+/**
+ * 节流函数工具
+ * 
+ * @param fn - 要节流的函数
+ * @param delay - 延迟时间（毫秒）
+ * @returns 节流后的函数
+ */
+function throttle<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number
+): T & { cancel: () => void } {
+  let lastCall = 0
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  const throttled = function (this: unknown, ...args: Parameters<T>) {
+    const now = Date.now()
+    const remaining = delay - (now - lastCall)
+
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      lastCall = now
+      fn.apply(this, args)
+    } else if (!timeoutId) {
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now()
+        timeoutId = null
+        fn.apply(this, args)
+      }, remaining)
+    }
+  } as T & { cancel: () => void }
+
+  throttled.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
   }
-]
+
+  return throttled
+}
 
 /**
  * 尺寸管理器类
  * 
- * 管理整个应用的尺寸系统，包括预设配置、CSS 生成和持久化
+ * 管理整个应用的尺寸系统，包括预设配置、CSS 生成和持久化。
+ * 
+ * @class SizeManager
+ * @example
+ * ```typescript
+ * const manager = new SizeManager({
+ *   storageKey: 'my-app-size',
+ *   defaultPreset: 'comfortable'
+ * })
+ * 
+ * manager.applyPreset('spacious')
+ * console.log(manager.getCurrentPreset()) // 'spacious'
+ * ```
  */
 export class SizeManager {
   /** 当前尺寸配置 */
   private config: SizeConfig
 
   /** 预设配置映射表（name -> preset） */
-  private presets: Map<string, SizePreset>
+  private readonly presets: Map<string, SizePreset>
 
   /** 监听器集合（使用 Set 自动去重） */
-  private listeners: Set<SizeChangeListener>
+  private readonly listeners: Set<SizeChangeListener>
 
   /** 样式元素引用（用于注入 CSS） */
   private styleElement: HTMLStyleElement | null = null
 
   /** 当前预设名称 */
-  private currentPresetName: string = 'default'
+  private currentPresetName: SizePresetName = 'default'
 
   /** localStorage 存储键名 */
-  private storageKey: string
+  private readonly storageKey: string
 
   /** 管理器是否已销毁 */
   private isDestroyed = false
 
   /** CSS 缓存映射（cacheKey -> css） */
-  private cssCache = new Map<string, string>()
+  private readonly cssCache = new Map<string, string>()
 
   /** 上次生成的 CSS 字符串（用于去重） */
   private lastGeneratedCSS = ''
@@ -141,21 +245,33 @@ export class SizeManager {
   /** 是否已调度通知（防止重复调度） */
   private notificationScheduled = false
 
+  /** 节流选项 */
+  private readonly enableThrottle: boolean
+  private readonly throttleDelay: number
+
+  /** 节流的 applySize 函数 */
+  private throttledApplySize: (() => void) & { cancel: () => void }
+
   /**
    * 构造函数
    * 
    * @param options - 配置选项
    * @param options.storageKey - localStorage 存储键名
    * @param options.presets - 自定义预设数组
+   * @param options.defaultPreset - 默认预设名称
+   * @param options.enableThrottle - 是否启用节流
+   * @param options.throttleDelay - 节流延迟时间
    */
-  constructor(options: { storageKey?: string; presets?: SizePreset[] } = {}) {
+  constructor(options: SizeManagerOptions = {}) {
     // 初始化存储键名
-    this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY
+    this.storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY
+    this.enableThrottle = options.enableThrottle ?? true
+    this.throttleDelay = options.throttleDelay ?? FRAME_BUDGET
 
     // 初始化默认配置
-    this.config = {
+    this.config = Object.freeze({
       baseSize: SIZE_CONFIG.DEFAULT_BASE_SIZE
-    }
+    })
 
     // 初始化预设映射表
     this.presets = new Map()
@@ -163,17 +279,27 @@ export class SizeManager {
     // 初始化监听器集合（使用 Set 自动去重和高效删除）
     this.listeners = new Set()
 
-    // 加载默认预设
-    defaultPresets.forEach(preset => {
+    // 加载默认预设（不可变）
+    for (const preset of DEFAULT_PRESETS) {
       this.presets.set(preset.name, preset)
-    })
+    }
 
     // 加载自定义预设
-    if (options.presets) {
-      options.presets.forEach(preset => {
-        this.presets.set(preset.name, preset)
-      })
+    if (options.presets?.length) {
+      for (const preset of options.presets) {
+        this.presets.set(preset.name, Object.freeze({ ...preset }))
+      }
     }
+
+    // 设置默认预设
+    if (options.defaultPreset && this.presets.has(options.defaultPreset)) {
+      this.currentPresetName = options.defaultPreset
+    }
+
+    // 创建节流的 applySize
+    this.throttledApplySize = this.enableThrottle
+      ? throttle(() => this.applySize(), this.throttleDelay)
+      : Object.assign(() => this.applySize(), { cancel: () => {} })
 
     // 从存储加载保存的配置
     this.loadFromStorage()
@@ -197,25 +323,46 @@ export class SizeManager {
    * 会触发 CSS 重新生成、持久化保存和监听器通知
    * 
    * @param config - 要更新的配置（部分）
-   * @throws {Error} 如果 baseSize 无效
+   * @throws {RangeError} 如果 baseSize 不在有效范围内
+   * @throws {TypeError} 如果 baseSize 不是数字
+   * 
+   * @example
+   * ```typescript
+   * manager.setConfig({ baseSize: 18 })
+   * ```
    */
   setConfig(config: Partial<SizeConfig>): void {
+    // 如果已销毁，直接返回
+    if (this.isDestroyed) {
+      console.warn('[SizeManager] Cannot setConfig: manager is destroyed')
+      return
+    }
+
     // 验证配置
     if (config.baseSize !== undefined) {
-      if (typeof config.baseSize !== 'number' || config.baseSize <= 0 || config.baseSize > 100) {
-        throw new Error('Invalid baseSize: must be a positive number between 0 and 100')
+      if (typeof config.baseSize !== 'number' || Number.isNaN(config.baseSize)) {
+        throw new TypeError('Invalid baseSize: must be a number')
+      }
+      if (config.baseSize < SIZE_CONFIG.MIN_BASE_SIZE || config.baseSize > SIZE_CONFIG.MAX_BASE_SIZE) {
+        throw new RangeError(
+          `Invalid baseSize: must be between ${SIZE_CONFIG.MIN_BASE_SIZE} and ${SIZE_CONFIG.MAX_BASE_SIZE}`
+        )
       }
     }
 
-    // 合并配置
-    this.config = {
+    // 合并配置（创建新的不可变对象）
+    this.config = Object.freeze({
       ...this.config,
       ...config
-    }
+    })
 
     try {
-      // 应用新配置
-      this.applySize()
+      // 使用节流应用新配置
+      if (this.enableThrottle) {
+        this.throttledApplySize()
+      } else {
+        this.applySize()
+      }
       // 保存到存储
       this.saveToStorage()
       // 通知监听器
@@ -239,22 +386,47 @@ export class SizeManager {
    * 应用预设配置
    * 
    * @param presetName - 预设名称
+   * @returns 是否成功应用
+   * 
+   * @example
+   * ```typescript
+   * const success = manager.applyPreset('spacious')
+   * if (success) {
+   *   console.log('预设应用成功')
+   * }
+   * ```
    */
-  applyPreset(presetName: string): void {
-    const preset = this.presets.get(presetName)
-    if (!preset) {
-      console.warn(`[SizeManager] Preset '${presetName}' not found, available presets:`, Array.from(this.presets.keys()))
-      return
+  applyPreset(presetName: SizePresetName): boolean {
+    if (this.isDestroyed) {
+      console.warn('[SizeManager] Cannot applyPreset: manager is destroyed')
+      return false
     }
 
-    console.info(`[SizeManager] 应用预设: ${presetName}, baseSize: ${preset.baseSize}px`)
+    const preset = this.presets.get(presetName)
+    if (!preset) {
+      console.warn(
+        `[SizeManager] Preset '${presetName}' not found. Available: ${Array.from(this.presets.keys()).join(', ')}`
+      )
+      return false
+    }
+
+    // 如果已经是当前预设，跳过
+    if (this.currentPresetName === presetName && this.config.baseSize === preset.baseSize) {
+      return true
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[SizeManager] 应用预设: ${presetName} (baseSize: ${preset.baseSize}px)`)
+    }
+
     this.currentPresetName = presetName
     // 清除 lastGeneratedCSS 以确保 CSS 会被重新应用
     this.lastGeneratedCSS = ''
     this.setConfig({
       baseSize: preset.baseSize
     })
-    console.info(`[SizeManager] 预设应用完成: ${presetName}`)
+
+    return true
   }
 
   /**
@@ -262,7 +434,7 @@ export class SizeManager {
    * 
    * @returns 当前预设名称
    */
-  getCurrentPreset(): string {
+  getCurrentPreset(): SizePresetName {
     return this.currentPresetName
   }
 
@@ -270,8 +442,9 @@ export class SizeManager {
    * 获取当前尺寸（getCurrentPreset 的别名）
    * 
    * @returns 当前预设名称
+   * @deprecated 使用 getCurrentPreset() 代替
    */
-  getCurrentSize(): string {
+  getCurrentSize(): SizePresetName {
     return this.currentPresetName
   }
 
@@ -279,36 +452,88 @@ export class SizeManager {
    * 设置尺寸（applyPreset 的别名）
    * 
    * @param size - 预设名称
+   * @returns 是否成功应用
+   * @deprecated 使用 applyPreset() 代替
    */
-  setSize(size: string): void {
-    this.applyPreset(size)
+  setSize(size: SizePresetName): boolean {
+    return this.applyPreset(size)
   }
 
   /**
    * 获取所有预设名称列表
    * 
-   * @returns 预设名称数组
+   * @returns 预设名称数组（只读）
    */
-  getSizes(): string[] {
+  getSizes(): ReadonlyArray<string> {
     return Array.from(this.presets.keys())
   }
 
   /**
    * 获取所有预设配置
    * 
-   * @returns 预设配置数组
+   * @returns 预设配置数组（只读）
    */
-  getPresets(): SizePreset[] {
+  getPresets(): ReadonlyArray<Readonly<SizePreset>> {
     return Array.from(this.presets.values())
+  }
+
+  /**
+   * 根据名称获取单个预设
+   * 
+   * @param name - 预设名称
+   * @returns 预设配置或 undefined
+   */
+  getPreset(name: SizePresetName): Readonly<SizePreset> | undefined {
+    return this.presets.get(name)
   }
 
   /**
    * 添加自定义预设
    * 
    * @param preset - 预设配置
+   * @throws {Error} 如果管理器已销毁
+   * 
+   * @example
+   * ```typescript
+   * manager.addPreset({
+   *   name: 'extra-large',
+   *   label: '超大',
+   *   baseSize: 20,
+   *   category: 'accessibility'
+   * })
+   * ```
    */
   addPreset(preset: SizePreset): void {
-    this.presets.set(preset.name, preset)
+    if (this.isDestroyed) {
+      throw new Error('[SizeManager] Cannot addPreset: manager is destroyed')
+    }
+    // 冻结预设以保持不可变性
+    this.presets.set(preset.name, Object.freeze({ ...preset }))
+  }
+
+  /**
+   * 删除自定义预设
+   * 
+   * @param name - 预设名称
+   * @returns 是否删除成功
+   */
+  removePreset(name: SizePresetName): boolean {
+    // 不允许删除默认预设
+    if (DEFAULT_PRESETS.some(p => p.name === name)) {
+      console.warn(`[SizeManager] Cannot remove default preset: ${name}`)
+      return false
+    }
+    return this.presets.delete(name)
+  }
+
+  /**
+   * 检查预设是否存在
+   * 
+   * @param name - 预设名称
+   * @returns 是否存在
+   */
+  hasPreset(name: SizePresetName): boolean {
+    return this.presets.has(name)
   }
 
   /**
@@ -895,13 +1120,14 @@ export class SizeManager {
    * 销毁管理器，清理所有资源
    * 
    * 包括：
+   * - 取消节流定时器
    * - 移除 DOM 中的 style 元素
    * - 清理所有监听器
    * - 清空预设和缓存
    * - 标记为已销毁状态
    * 
    * @example
-   * ```ts
+   * ```typescript
    * const manager = new SizeManager()
    * // ... 使用管理器
    * manager.destroy() // 清理资源
@@ -910,6 +1136,9 @@ export class SizeManager {
   destroy(): void {
     if (this.isDestroyed) return
 
+    // 取消节流定时器
+    this.throttledApplySize.cancel()
+
     // 清理 DOM 元素
     if (this.styleElement?.parentNode) {
       this.styleElement.parentNode.removeChild(this.styleElement)
@@ -917,9 +1146,7 @@ export class SizeManager {
     }
 
     // 清理监听器
-    if (this.listeners instanceof Set) {
-      this.listeners.clear()
-    }
+    this.listeners.clear()
     this.pendingListenerNotifications = []
 
     // 清理预设映射表
@@ -932,6 +1159,15 @@ export class SizeManager {
     // 标记为已销毁
     this.isDestroyed = true
   }
+
+  /**
+   * 检查管理器是否已销毁
+   * 
+   * @returns 是否已销毁
+   */
+  get destroyed(): boolean {
+    return this.isDestroyed
+  }
 }
 
 /**
@@ -940,7 +1176,7 @@ export class SizeManager {
  * 可以在整个应用中共享使用
  * 
  * @example
- * ```ts
+ * ```typescript
  * import { sizeManager } from '@ldesign/size'
  * 
  * sizeManager.applyPreset('comfortable')

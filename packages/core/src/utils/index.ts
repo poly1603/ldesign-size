@@ -122,7 +122,7 @@ export function formatSize(size: SizeValue): string {
 export function convertSize(
   size: SizeValue,
   targetUnit: SizeUnit,
-  rootFontSize = SIZE_CONFIG.DEFAULT_ROOT_FONT_SIZE
+  rootFontSize: number = SIZE_CONFIG.DEFAULT_ROOT_FONT_SIZE
 ): SizeValue {
   // 快速路径：相同单位，直接返回
   if (size.unit === targetUnit) {

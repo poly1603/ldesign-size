@@ -447,9 +447,14 @@ export interface SizeManagerState {
  * Size calculation options
  */
 export interface SizeCalculationOptions {
+  /** 精度（小数位数） */
   precision?: number;
+  /** 目标单位 */
   unit?: SizeUnit;
+  /** 限制范围 */
   clamp?: { min?: SizeInput; max?: SizeInput };
+  /** 根字体大小（用于 rem/em 转换） */
+  rootFontSize?: number;
 }
 
 /**

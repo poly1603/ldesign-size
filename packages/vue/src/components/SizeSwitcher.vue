@@ -1,31 +1,63 @@
 <template>
   <div ref="containerRef" :class="containerClass" :data-variant="variant || 'light'">
-    <button type="button" :class="triggerClass" :disabled="disabled" :title="sizeTooltip" @click="isOpen = !isOpen">
-      <Type :size="18" :stroke-width="2" />
+    <!-- 触发按钮 -->
+    <button 
+      type="button" 
+      :class="triggerClass" 
+      :disabled="disabled" 
+      :title="sizeTooltip" 
+      :aria-label="sizeTooltip"
+      :aria-expanded="isOpen"
+      :aria-haspopup="true"
+      @click="toggleDropdown"
+      @keydown.escape="closeDropdown"
+    >
+      <Type :size="iconSize" :stroke-width="2" />
     </button>
 
+    <!-- 下拉菜单 -->
     <Transition name="ldesign-dropdown">
-      <div v-if="isOpen" class="ldesign-size-switcher__dropdown">
+      <div 
+        v-if="isOpen" 
+        class="ldesign-size-switcher__dropdown"
+        role="listbox"
+        :aria-label="titleText"
+      >
         <div class="ldesign-size-switcher__arrow" />
         <div class="ldesign-size-switcher__header">
           <h4 class="ldesign-size-switcher__title">{{ titleText }}</h4>
+          <span class="ldesign-size-switcher__current-label">{{ currentPresetLabel }}</span>
         </div>
         <div class="ldesign-size-switcher__list">
-          <div v-for="preset in presets" :key="preset.name" :class="[
-            'ldesign-size-switcher__item',
-            currentPreset?.name === preset.name && 'ldesign-size-switcher__item--active'
-          ]" @click="selectPreset(preset.name)">
+          <button
+            v-for="preset in presets" 
+            :key="preset.name" 
+            type="button"
+            :class="[
+              'ldesign-size-switcher__item',
+              currentPreset?.name === preset.name && 'ldesign-size-switcher__item--active'
+            ]" 
+            role="option"
+            :aria-selected="currentPreset?.name === preset.name"
+            @click="selectPreset(preset.name)"
+            @keydown.enter="selectPreset(preset.name)"
+          >
             <span class="ldesign-size-switcher__item-icon">
-              <span
-                :style="{ fontSize: `${Math.max(12, (preset.config?.baseSize || preset.baseSize || 16) - 2)}px` }">A</span>
+              <span :style="{ fontSize: getPreviewFontSize(preset) }">Aa</span>
             </span>
             <div class="ldesign-size-switcher__item-info">
               <span class="ldesign-size-switcher__item-label">{{ getPresetLabel(preset) }}</span>
               <span class="ldesign-size-switcher__item-desc">{{ getPresetDesc(preset) }}</span>
             </div>
-            <Check v-if="currentPreset?.name === preset.name" :size="16" :stroke-width="3"
-              class="ldesign-size-switcher__check" />
-          </div>
+            <Transition name="ldesign-check">
+              <Check 
+                v-if="currentPreset?.name === preset.name" 
+                :size="16" 
+                :stroke-width="3"
+                class="ldesign-size-switcher__check" 
+              />
+            </Transition>
+          </button>
         </div>
       </div>
     </Transition>
@@ -33,18 +65,47 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * SizeSwitcher - 尺寸切换器组件
+ * 
+ * 提供一个美观的下拉菜单来切换应用的尺寸预设
+ * 
+ * @example
+ * ```vue
+ * <SizeSwitcher variant="light" size="medium" />
+ * ```
+ */
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import { Type, Check } from 'lucide-vue-next'
 import type { SizePresetTheme } from '@ldesign/size-core'
 
-// Props
-const props = defineProps<{
+/** 组件 Props 定义 */
+interface SizeSwitcherProps {
+  /** 是否禁用 */
   disabled?: boolean
+  /** 按钮尺寸 */
   size?: 'small' | 'medium' | 'large'
+  /** 自定义标题 */
   title?: string
+  /** 翻译函数 */
   translate?: (key: string) => string
+  /** 语言设置 */
   locale?: string | { value: string }
+  /** 样式变体 */
   variant?: 'light' | 'primary'
+}
+
+// Props
+const props = withDefaults(defineProps<SizeSwitcherProps>(), {
+  disabled: false,
+  size: 'medium',
+  variant: 'light'
+})
+
+// Emits
+const emit = defineEmits<{
+  /** 预设变化事件 */
+  (e: 'change', presetName: string): void
 }>()
 
 // 获取当前组件实例，访问全局属性
@@ -56,7 +117,9 @@ const containerRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
 
 // 响应式当前预设名称
-const currentPresetName = ref<string | null>(sizeManager?.getCurrentPreset?.()?.name || null)
+const currentPresetName = ref<string | null>(
+  sizeManager?.getCurrentPreset?.() || null
+)
 
 // 获取所有预设
 const presets = computed<SizePresetTheme[]>(() => {
@@ -65,10 +128,24 @@ const presets = computed<SizePresetTheme[]>(() => {
 
 // 当前预设
 const currentPreset = computed(() => {
-  // 使用 currentPresetName 触发响应式更新
   const name = currentPresetName.value
   if (!name) return sizeManager?.getCurrentPreset?.() || null
   return presets.value.find(p => p.name === name) || null
+})
+
+// 当前预设标签
+const currentPresetLabel = computed(() => {
+  if (!currentPreset.value) return ''
+  return getPresetLabel(currentPreset.value)
+})
+
+// 图标大小
+const iconSize = computed(() => {
+  switch (props.size) {
+    case 'small': return 14
+    case 'large': return 22
+    default: return 18
+  }
 })
 
 // 获取当前语言
@@ -91,7 +168,7 @@ const isZh = computed(() => {
 const titleText = computed(() => {
   if (props.title) return props.title
   if (props.translate) return props.translate('size.title')
-  return isZh.value ? '尺寸管理' : 'Size Management'
+  return isZh.value ? '尺寸设置' : 'Size'
 })
 
 // 尺寸提示文本
@@ -105,6 +182,7 @@ const triggerClass = computed(() => {
   const classes = ['ldesign-size-switcher__trigger']
   if (props.size === 'small') classes.push('ldesign-size-switcher__trigger--small')
   if (props.size === 'large') classes.push('ldesign-size-switcher__trigger--large')
+  if (isOpen.value) classes.push('ldesign-size-switcher__trigger--active')
   return classes.join(' ')
 })
 
@@ -112,14 +190,14 @@ const triggerClass = computed(() => {
 const containerClass = computed(() => {
   const classes = ['ldesign-size-switcher']
   if (props.disabled) classes.push('ldesign-size-switcher--disabled')
+  if (isOpen.value) classes.push('ldesign-size-switcher--open')
   return classes.join(' ')
 })
 
-// 获取预设标签
+/** 获取预设标签 */
 function getPresetLabel(preset: SizePresetTheme): string {
   if (props.translate) {
     const translated = props.translate(`size.presets.${preset.name}`)
-    // 如果翻译返回的是键本身，说明没有翻译，回退到 label
     if (translated && !translated.startsWith('size.presets.')) {
       return translated
     }
@@ -127,73 +205,114 @@ function getPresetLabel(preset: SizePresetTheme): string {
   return preset.label || preset.name
 }
 
-// 获取预设描述
+/** 获取预设描述 */
 function getPresetDesc(preset: SizePresetTheme): string {
   const baseSize = preset.config?.baseSize || (preset as any).baseSize || 16
-  const scale = preset.config?.scale || (preset as any).scale || 1.25
-  return `${baseSize}px · ${scale}x`
+  return `${baseSize}px`
 }
 
-// 选择预设
+/** 获取预览字体大小 */
+function getPreviewFontSize(preset: SizePresetTheme): string {
+  const baseSize = preset.config?.baseSize || (preset as any).baseSize || 16
+  // 映射到合理的预览大小范围 (12-18px)
+  const previewSize = Math.max(12, Math.min(18, baseSize - 2))
+  return `${previewSize}px`
+}
+
+/** 切换下拉菜单 */
+function toggleDropdown() {
+  if (props.disabled) return
+  isOpen.value = !isOpen.value
+}
+
+/** 关闭下拉菜单 */
+function closeDropdown() {
+  isOpen.value = false
+}
+
+/** 选择预设 */
 function selectPreset(name: string) {
-  console.log('[SizeSwitcher] selectPreset:', name, 'sizeManager:', sizeManager)
   if (sizeManager) {
     try {
       sizeManager.applyPreset(name)
-      // 更新响应式状态
       currentPresetName.value = name
-      console.log('[SizeSwitcher] applyPreset success, currentPreset:', sizeManager.getCurrentPreset?.())
+      emit('change', name)
     } catch (e) {
       console.error('[SizeSwitcher] applyPreset error:', e)
     }
   }
-  isOpen.value = false
+  closeDropdown()
 }
 
-// 点击外部关闭下拉菜单
-const handleClickOutside = (e: MouseEvent) => {
+/** 点击外部关闭下拉菜单 */
+function handleClickOutside(e: MouseEvent) {
   if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
-    isOpen.value = false
+    closeDropdown()
+  }
+}
+
+/** 键盘导航 */
+function handleKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isOpen.value) {
+    closeDropdown()
   }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleKeyDown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
 <style>
-/* SizeSwitcher 组件样式 - 参考 ThemeColorPicker */
+/* SizeSwitcher 组件样式 */
 .ldesign-size-switcher {
   position: relative;
   display: inline-flex;
   align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* 触发按钮 */
 .ldesign-size-switcher__trigger {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px;
   min-width: 36px;
   min-height: 36px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--color-bg, #ffffff);
   cursor: pointer;
-  transition: all 150ms ease-out;
-  color: #6b7280;
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--color-text-secondary, #6b7280);
+  outline: none;
 }
 
 .ldesign-size-switcher__trigger:hover {
   border-color: var(--color-primary-400, #60a5fa);
   background: var(--color-primary-50, #eff6ff);
   color: var(--color-primary-500, #3b82f6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.ldesign-size-switcher__trigger:focus-visible {
+  border-color: var(--color-primary-500, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.ldesign-size-switcher__trigger--active {
+  border-color: var(--color-primary-500, #3b82f6);
+  background: var(--color-primary-50, #eff6ff);
+  color: var(--color-primary-600, #2563eb);
 }
 
 /* ===== Variant-based trigger styling ===== */
@@ -238,102 +357,139 @@ onUnmounted(() => {
   padding: 12px;
 }
 
+/* 下拉菜单 */
 .ldesign-size-switcher__dropdown {
   position: absolute;
-  top: calc(100% + 12px);
+  top: calc(100% + 8px);
   right: 0;
-  width: 320px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  width: 280px;
+  background: var(--color-bg, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 10px 20px -5px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  overflow: visible;
+  overflow: hidden;
 }
 
+/* 箭头 */
 .ldesign-size-switcher__arrow {
   position: absolute;
   top: -6px;
-  right: 12px;
+  right: 14px;
   width: 12px;
   height: 12px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
   border-right: none;
   border-bottom: none;
   transform: rotate(45deg);
   z-index: 10;
 }
 
+/* 头部 */
 .ldesign-size-switcher__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  background: #f9fafb;
-  border-radius: 12px 12px 0 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-light, #f3f4f6);
+  background: var(--color-bg-secondary, #f9fafb);
 }
 
 .ldesign-size-switcher__title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text, #1f2937);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
+.ldesign-size-switcher__current-label {
+  font-size: 12px;
+  color: var(--color-primary-500, #3b82f6);
+  font-weight: 500;
+  padding: 2px 8px;
+  background: var(--color-primary-50, #eff6ff);
+  border-radius: 4px;
+}
+
+/* 列表 */
 .ldesign-size-switcher__list {
-  max-height: 400px;
+  max-height: 320px;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
 }
 
 .ldesign-size-switcher__list::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .ldesign-size-switcher__list::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
+  background: var(--color-border, #d1d5db);
+  border-radius: 2px;
 }
 
+.ldesign-size-switcher__list::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary, #9ca3af);
+}
+
+/* 列表项 */
 .ldesign-size-switcher__item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
+  border: none;
   border-radius: 8px;
+  background: transparent;
   cursor: pointer;
-  transition: all 150ms ease-out;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  text-align: left;
 }
 
 .ldesign-size-switcher__item:hover {
-  background: #f3f4f6;
+  background: var(--color-bg-hover, #f3f4f6);
+}
+
+.ldesign-size-switcher__item:focus-visible {
+  outline: 2px solid var(--color-primary-500, #3b82f6);
+  outline-offset: -2px;
 }
 
 .ldesign-size-switcher__item--active {
   background: var(--color-primary-50, #eff6ff);
 }
 
+/* 项目图标 */
 .ldesign-size-switcher__item-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  font-weight: 600;
-  color: #6b7280;
-  background: #f3f4f6;
+  font-weight: 700;
+  color: var(--color-text-tertiary, #6b7280);
+  background: var(--color-bg-hover, #f3f4f6);
   border-radius: 8px;
   flex-shrink: 0;
-  transition: all 150ms ease-out;
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.ldesign-size-switcher__item:hover .ldesign-size-switcher__item-icon {
+  transform: scale(1.05);
 }
 
 .ldesign-size-switcher__item--active .ldesign-size-switcher__item-icon {
   color: #ffffff;
   background: var(--color-primary-500, #3b82f6);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
+/* 项目信息 */
 .ldesign-size-switcher__item-info {
   flex: 1;
   min-width: 0;
@@ -345,21 +501,27 @@ onUnmounted(() => {
 .ldesign-size-switcher__item-label {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--color-text, #1f2937);
   line-height: 1.4;
 }
 
 .ldesign-size-switcher__item-desc {
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.4;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #9ca3af);
+  line-height: 1.3;
+  font-family: "SF Mono", Monaco, Consolas, monospace;
 }
 
 .ldesign-size-switcher__item--active .ldesign-size-switcher__item-label {
   color: var(--color-primary-600, #2563eb);
+  font-weight: 600;
 }
 
+.ldesign-size-switcher__item--active .ldesign-size-switcher__item-desc {
+  color: var(--color-primary-500, #3b82f6);
+}
+
+/* 选中图标 */
 .ldesign-size-switcher__check {
   color: var(--color-primary-500, #3b82f6);
   flex-shrink: 0;
@@ -367,7 +529,7 @@ onUnmounted(() => {
 
 /* 下拉动画 */
 .ldesign-dropdown-enter-active {
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ldesign-dropdown-leave-active {
@@ -377,12 +539,32 @@ onUnmounted(() => {
 .ldesign-dropdown-enter-from,
 .ldesign-dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-8px) scale(0.96);
+  transform: translateY(-6px) scale(0.98);
 }
 
+/* 选中图标动画 */
+.ldesign-check-enter-active {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ldesign-check-leave-active {
+  transition: all 0.1s ease-out;
+}
+
+.ldesign-check-enter-from,
+.ldesign-check-leave-to {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+/* 禁用状态 */
 .ldesign-size-switcher--disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   pointer-events: none;
+}
+
+.ldesign-size-switcher--disabled .ldesign-size-switcher__trigger {
+  cursor: not-allowed;
 }
 
 /* 暗色主题 */
